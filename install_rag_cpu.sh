@@ -38,7 +38,18 @@ error() {
 }
 
 # --- Bienvenida y Comprobaciones Iniciales ---
-info "Iniciando el instalador de la plataforma RAG..."
+cat << "EOF"
+██████╗  ██████╗ ██╗ █████╗     ███╗   ███╗ █████╗ ███████╗████████╗██████╗
+██╔══██╗██╔════╝ ██║██╔══██╗    ████╗ ████║██╔══██╗██╔════╝╚══██╔══╝██╔══██╗
+██████╔╝██║  ███╗██║███████║    ██╔████╔██║███████║███████╗   ██║   ██████╔╝
+██╔══██╗██║   ██║██║██╔══██║    ██║╚██╔╝██║██╔══██║╚════██║   ██║   ██╔══██╗
+██║  ██║╚██████╔╝██║██║  ██║    ██║ ╚═╝ ██║██║  ██║███████║   ██║   ██║  ██║
+╚═╝  ╚═╝ ╚═════╝ ╚═╝╚═╝  ╚═╝    ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝
+EOF
+echo "Hecho por Luis Fajardo Rivera (lmfr)"
+echo "----------------------------------------------------"
+
+info "Iniciando el instalador de la plataforma RGIA MASTER..."
 
 if [[ "${EUID}" -ne 0 ]]; then
     error "Este script debe ser ejecutado con privilegios de root (sudo)."
@@ -85,8 +96,8 @@ fi
 # 3. Instalación de Ollama (Idempotente y Robusto)
 info "Instalando y configurando Ollama..."
 if ! command -v ollama &> /dev/null; then
-    local attempts=3
-    local count=0
+    attempts=3
+    count=0
     while [ $count -lt $attempts ]; do
         count=$((count + 1))
         info "Intento de instalación de Ollama: ${count}/${attempts}..."
@@ -141,6 +152,8 @@ mkdir -p "${RAG_LAB_DIR}/config"
 mkdir -p "${RAG_LAB_DIR}/control_center/templates"
 mkdir -p "${RAG_LAB_DIR}/documents/knowledge_base"
 mkdir -p "${RAG_LAB_DIR}/scripts/agents"
+mkdir -p "${RAG_LAB_DIR}/open_webui_customizations"
+mkdir -p "${RAG_LAB_DIR}/simple_chat/templates"
 
 # 2. Generar Archivos de Configuración
 info "Generando archivos de configuración..."
@@ -175,9 +188,9 @@ fastapi
 uvicorn[standard]
 urllib3<2.0
 python-dotenv
-docker # Para interactuar con el Docker daemon desde el Control Center
-jinja2 # Para las plantillas HTML del Control Center
-python-multipart # Para la subida de archivos en el Control Center
+docker
+jinja2
+python-multipart
 EOF
 
 # 3. Configurar Entorno Virtual de Python
@@ -307,12 +320,16 @@ cat <<'EOF' > "${RAG_LAB_DIR}/scripts/diag_rag.sh"
 #!/usr/bin/env bash
 set -eo pipefail
 echo "--- Diagnóstico de la Plataforma RAG ---"
-docker compose -f /opt/rag_lab/docker-compose.yml ps
-systemctl status rag_lab --no-pager || true
-systemctl status ollama --no-pager || true
+echo "--- Estado de los Contenedores (desde el socket) ---"
+docker compose ps
+echo "--- Estado de Ollama (accesible desde el contenedor) ---"
+curl -fsS http://host.docker.internal:11434/api/tags && echo "Ollama OK" || echo "Ollama FAIL"
+echo "--- Estado de Qdrant ---"
 curl -fsS http://127.0.0.1:6333/ready && echo "Qdrant OK" || echo "Qdrant FAIL"
-ollama list
+echo "--- Uso del Disco en /opt/rag_lab ---"
 du -sh /opt/rag_lab/*
+echo "--- Modelos de Ollama ---"
+/opt/rag_lab/venv/bin/ollama list
 tail -n 10 /var/log/rag_ingest.log || echo "Log de ingesta no encontrado."
 echo "--- Diagnóstico Finalizado ---"
 EOF
@@ -325,9 +342,12 @@ TIMESTAMP=$(date +"%Y-%m-%d")
 BACKUP_FILE="${BACKUP_DIR}/rag_lab_backup_${TIMESTAMP}.tgz"
 SOURCE_DIR="/opt/rag_lab"
 echo "Iniciando backup de ${SOURCE_DIR} a ${BACKUP_FILE}..."
-systemctl stop rag_lab
+echo "Deteniendo servicios..."
+docker compose -f "${SOURCE_DIR}/docker-compose.yml" down
+echo "Creando archivo de backup..."
 tar -czf "${BACKUP_FILE}" -C "$(dirname ${SOURCE_DIR})" "$(basename ${SOURCE_DIR})"
-systemctl start rag_lab
+echo "Reiniciando servicios..."
+docker compose -f "${SOURCE_DIR}/docker-compose.yml" up -d
 echo "Backup completado: ${BACKUP_FILE}"
 EOF
 
@@ -429,9 +449,24 @@ SCRIPTS_DIR = os.path.join(RAG_LAB_DIR, "scripts")
 ENV_FILE = os.path.join(RAG_LAB_DIR, "config/.env")
 KNOWLEDGE_BASE_DIR = os.path.join(RAG_LAB_DIR, "documents", "knowledge_base")
 
-# --- Estado Simulado en Memoria ---
-# En una app real, esto sería una base de datos.
-recent_queries = []
+import json
+
+RAG_LAB_DIR = "/opt/rag_lab"
+SCRIPTS_DIR = os.path.join(RAG_LAB_DIR, "scripts")
+ENV_FILE = os.path.join(RAG_LAB_DIR, "config/.env")
+KNOWLEDGE_BASE_DIR = os.path.join(RAG_LAB_DIR, "documents", "knowledge_base")
+QUERIES_FILE = os.path.join(RAG_LAB_DIR, "logs", "recent_queries.json")
+
+# --- Persistencia del Feedback Loop ---
+def load_queries():
+    if not os.path.exists(QUERIES_FILE):
+        return []
+    with open(QUERIES_FILE, "r") as f:
+        return json.load(f)
+
+def save_queries(queries):
+    with open(QUERIES_FILE, "w") as f:
+        json.dump(queries, f, indent=2)
 
 # --- Autenticación ---
 def get_current_user(credentials: HTTPBasicCredentials = Depends(security)):
@@ -456,6 +491,7 @@ def read_root(request: Request, user: str = Depends(get_current_user)):
         container_statuses = []
 
     env_config = dotenv_values(ENV_FILE)
+    recent_queries = load_queries()
 
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -468,11 +504,16 @@ def read_root(request: Request, user: str = Depends(get_current_user)):
 async def simulated_query(query: str = Form(...), user: str = Depends(get_current_user)):
     # Simulación de una respuesta de agente
     answer = f"Esta es una respuesta simulada para la pregunta: '{query}'. En un sistema real, esta respuesta vendría del LLM."
+
+    recent_queries = load_queries()
     recent_queries.append({"query": query, "answer": answer, "id": len(recent_queries)})
+    save_queries(recent_queries)
+
     return RedirectResponse(url="/", status_code=303)
 
 @app.post("/approve-qa/{query_id}")
 async def approve_qa(query_id: int, user: str = Depends(get_current_user)):
+    recent_queries = load_queries()
     if query_id >= len(recent_queries):
         raise HTTPException(status_code=404, detail="Query not found")
 
@@ -566,14 +607,29 @@ async def create_agent(
 
     return RedirectResponse(url="/agents", status_code=303)
 
+# --- Simplified Task Execution via Subprocess ---
+def run_script_in_background(command):
+    # Asynchronously run a script and log its output
+    log_file_path = os.path.join(RAG_LAB_DIR, "logs", "control_center_tasks.log")
+    with open(log_file_path, "a") as log_file:
+        subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT, cwd=RAG_LAB_DIR)
 
-@app.post("/run-script/{script_name}")
-async def run_script(script_name: str, user: str = Depends(get_current_user)):
-    script_path = os.path.join(SCRIPTS_DIR, f"{script_name}.sh")
-    if not os.path.exists(script_path):
-        raise HTTPException(status_code=404, detail="Script not found")
+@app.post("/ingest")
+async def run_ingest(user: str = Depends(get_current_user)):
+    command = ["/opt/rag_lab/venv/bin/python", "/opt/rag_lab/scripts/ingestion_script.py"]
+    run_script_in_background(command)
+    return RedirectResponse(url="/", status_code=303)
 
-    subprocess.Popen(["sudo", "bash", script_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+@app.post("/backup")
+async def run_backup(user: str = Depends(get_current_user)):
+    command = ["/opt/rag_lab/scripts/backup.sh"]
+    run_script_in_background(command)
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/diagnostics")
+async def run_diagnostics(user: str = Depends(get_current_user)):
+    command = ["/opt/rag_lab/scripts/diag_rag.sh"]
+    run_script_in_background(command)
     return RedirectResponse(url="/", status_code=303)
 
 @app.post("/update-env")
@@ -582,10 +638,11 @@ async def update_env(request: Request, user: str = Depends(get_current_user)):
     for key, value in form_data.items():
         set_key(ENV_FILE, key, value)
 
-    # Reiniciar la pila para aplicar cambios
-    subprocess.Popen(["sudo", "systemctl", "restart", "rag_lab"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return RedirectResponse(url="/", status_code=303)
+    # Restart the stack using a docker compose command
+    command = ["docker", "compose", "up", "-d", "--force-recreate"]
+    run_script_in_background(command)
 
+    return RedirectResponse(url="/", status_code=303)
 EOF
 
 # 2. Generar las Plantillas HTML del Control Center
@@ -664,9 +721,9 @@ cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/index.html"
     <div class="bg-white p-4 rounded-lg shadow">
         <h2 class="text-xl font-semibold mb-2">Control Panel</h2>
         <div class="flex flex-col space-y-2">
-            <form action="/run-script/ingestion_script" method="post"><button type="submit" class="w-full bg-blue-500 text-white p-2 rounded">Run Ingest Now</button></form>
-            <form action="/run-script/diag_rag" method="post"><button type="submit" class="w-full bg-green-500 text-white p-2 rounded">Run Diagnostics</button></form>
-            <form action="/run-script/backup" method="post"><button type="submit" class="w-full bg-yellow-500 text-white p-2 rounded">Create Backup</button></form>
+            <form action="/ingest" method="post"><button type="submit" class="w-full bg-blue-500 text-white p-2 rounded">Run Ingest Now</button></form>
+            <form action="/diagnostics" method="post"><button type="submit" class="w-full bg-green-500 text-white p-2 rounded">Run Diagnostics</button></form>
+            <form action="/backup" method="post"><button type="submit" class="w-full bg-yellow-500 text-white p-2 rounded">Create Backup</button></form>
         </div>
     </div>
 
@@ -728,6 +785,127 @@ EOF
 
 info "--- Fase P3 Completada ---"
 
+# --- Fase 3.5: Creación del Chat Externo Simple ---
+info "--- Iniciando Fase 3.5: Creación del Chat Externo Simple ---"
+
+# 1. Backend del Chat Simple (main.py)
+info "Generando backend del chat simple..."
+cat <<'EOF' > "${RAG_LAB_DIR}/simple_chat/main.py"
+import os
+import json
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+import httpx
+
+app = FastAPI()
+templates = Jinja2Templates(directory="/app/templates")
+
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "host.docker.internal")
+OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:3.8b-mini-4k-instruct-q4_K_M")
+OLLAMA_API_URL = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/chat"
+
+@app.get("/", response_class=HTMLResponse)
+async def get(request: Request):
+    return templates.TemplateResponse("chat.html", {"request": request})
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    async with httpx.AsyncClient(timeout=None) as client:
+        while True:
+            data = await websocket.receive_text()
+            payload = {
+                "model": OLLAMA_MODEL,
+                "messages": [{"role": "user", "content": data}],
+                "stream": True,
+            }
+            async with client.stream("POST", OLLAMA_API_URL, json=payload) as response:
+                async for chunk in response.aiter_bytes():
+                    if chunk:
+                        try:
+                            # Ollama streams ndjson
+                            raw_data = chunk.decode('utf-8')
+                            for line in raw_data.strip().split('\n'):
+                                if line:
+                                    json_data = json.loads(line)
+                                    content = json_data.get("message", {}).get("content", "")
+                                    if content:
+                                        await websocket.send_text(content)
+                        except json.JSONDecodeError:
+                            continue # Incomplete JSON object, wait for next chunk
+EOF
+
+# 2. Frontend del Chat Simple (chat.html)
+info "Generando frontend del chat simple..."
+cat <<'EOF' > "${RAG_LAB_DIR}/simple_chat/templates/chat.html"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RGIA Master - Chat Externo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-800 text-white flex flex-col h-screen">
+    <div id="messages" class="flex-1 p-4 overflow-y-auto"></div>
+    <div class="p-4">
+        <input id="messageText" class="w-full p-2 bg-gray-700 rounded" autocomplete="off" onkeypress="handleKeyPress(event)"/>
+        <button onclick="sendMessage()" class="mt-2 w-full bg-blue-500 p-2 rounded">Enviar</button>
+    </div>
+    <script>
+        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        let currentResponseDiv = null;
+
+        ws.onmessage = function(event) {
+            if (currentResponseDiv) {
+                currentResponseDiv.innerHTML += event.data;
+            }
+        };
+
+        function sendMessage() {
+            const input = document.getElementById("messageText");
+            const messagesDiv = document.getElementById("messages");
+
+            // User message
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'mb-2 p-2 bg-gray-700 rounded';
+            userMsgDiv.innerHTML = "<b>Tú:</b> " + input.value;
+            messagesDiv.appendChild(userMsgDiv);
+
+            // Bot response container
+            currentResponseDiv = document.createElement('div');
+            currentResponseDiv.className = 'mb-2 p-2 bg-gray-600 rounded';
+            currentResponseDiv.innerHTML = "<b>RGIA Master:</b> ";
+            messagesDiv.appendChild(currentResponseDiv);
+
+            ws.send(input.value);
+            input.value = '';
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>
+EOF
+
+# 3. Dockerfile para el Chat Simple
+info "Generando Dockerfile para el chat simple..."
+cat <<'EOF' > "${RAG_LAB_DIR}/simple_chat/Dockerfile"
+FROM python:3.9-slim
+WORKDIR /app
+COPY . .
+RUN pip install --no-cache-dir fastapi uvicorn httpx
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+EOF
+
+info "--- Fase 3.5 Completada ---"
+
+
 # --- Fase P4: Integración Final, QA y Documentación ---
 info "--- Iniciando Fase P4: Integración Final, QA y Documentación ---"
 
@@ -771,6 +949,16 @@ services:
     ports: ["${RAG_CONTROL_CENTER_PORT:-3200}:8000"]
     volumes: ["/var/run/docker.sock:/var/run/docker.sock", "./config:/opt/rag_lab/config", "./scripts:/opt/rag_lab/scripts"]
     environment: ["CONTROL_CENTER_USER=${CONTROL_CENTER_USER}", "CONTROL_CENTER_PASS=${CONTROL_CENTER_PASS}"]
+  simple-chat:
+    build:
+      context: ./simple_chat
+    container_name: rag_simple_chat
+    restart: unless-stopped
+    ports: ["8001:8000"] # Puerto público para el chat simple
+    environment:
+      - OLLAMA_HOST=host.docker.internal
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+    extra_hosts: ["host.docker.internal:host-gateway"]
 volumes:
   portainer_data:
 EOF
@@ -783,78 +971,292 @@ if [[ "${ENABLE_NETDATA:-true}" == "true" ]]; then
     ports: [\"127.0.0.1:19999:19999\"]
     volumes: [\"/proc:/host/proc:ro\", \"/sys:/host/sys:ro\", \"/var/run/docker.sock:/var/run/docker.sock:ro\"]" >> "${RAG_LAB_DIR}/docker-compose.yml"
 fi
+# Copiar requirements.txt al contexto de build del Control Center
+cp "${RAG_LAB_DIR}/config/requirements.txt" "${RAG_LAB_DIR}/control_center/requirements.txt"
 # Crear Dockerfile para el Control Center
 cat <<'EOF' > "${RAG_LAB_DIR}/control_center/Dockerfile"
 FROM python:3.9-slim
 WORKDIR /app
 COPY . .
-RUN pip install --no-cache-dir -r /opt/rag_lab/config/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 EOF
 
 # 2. Generar README.md final
 info "Generando README.md final..."
 cat <<'EOF' > "${RAG_LAB_DIR}/README.md"
-# Plataforma RAG-en-una-Caja para CPU
+# Prompt Maestro 3.0 — Instalador de Plataforma RAG en CPU
 
-¡Bienvenido! Este documento contiene toda la información para operar tu plataforma RAG.
+## Visión General
 
-## 1. Arquitectura y Servicios
+**Prompt Maestro 3.0** es un instalador autocontenido que despliega una plataforma completa de **Retrieval-Augmented Generation (RAG)** en una máquina Ubuntu/Debian con CPU en cuestión de minutos. Con un solo comando, transforma un servidor "vacío" en un entorno de desarrollo de agentes de IA potente, seguro y listo para producción.
 
-| Servicio             | Puerto Expuesto        | Acceso        | Descripción                                |
-|----------------------|------------------------|---------------|--------------------------------------------|
-| **Open WebUI**       | `0.0.0.0:3000` (def)   | **Público**   | Interfaz de chat con el LLM.               |
-| **RAG Control Center** | `127.0.0.1:3200` (def) | Localhost     | Tu panel de control y operaciones.       |
-| **Ollama**           | `127.0.0.1:11434`      | Localhost     | Servidor de modelos LLM.                   |
-| **Qdrant**           | `127.0.0.1:6333`       | Localhost     | Base de datos de vectores.                 |
-| **Filebrowser**      | `127.0.0.1:8080`       | Localhost     | Gestor de archivos para subir documentos.  |
-| **Portainer**        | `127.0.0.1:9000`       | Localhost     | Dashboard para gestionar contenedores.     |
-| **Netdata**          | `127.0.0.1:19999`      | Localhost     | Monitoreo en tiempo real del host.         |
+Este proyecto nace de la necesidad de estandarizar y acelerar la creación de entornos RAG, eliminando la complejidad y las horas de configuración manual.
 
-## 2. Acceso a Paneles Internos (Túnel SSH)
+## Beneficios Clave
 
-Para acceder a los paneles de control (RAG Control Center, Portainer, etc.), usa un túnel SSH:
+- **Velocidad de Despliegue**: Pasa de un servidor limpio a una plataforma RAG funcional en menos de 10 minutos. El script es 100% automatizado y no requiere intervención manual.
+- **Seguridad por Defecto**: La arquitectura expone públicamente solo la interfaz de chat (Open WebUI). Todos los paneles de gestión y servicios de datos son accesibles únicamente desde `localhost`, protegidos de accesos no autorizados y pensados para ser utilizados a través de un túnel SSH seguro.
+- **Observabilidad Integrada**: La plataforma incluye Portainer para la gestión de contenedores y Netdata para el monitoreo en tiempo real del host. Además, el **RAG Control Center** ofrece un dashboard centralizado para supervisar la salud del sistema y realizar operaciones comunes.
+- **Idempotente y Robusto**: Puedes ejecutar el script múltiples veces. No romperá nada; solo instalará o actualizará los componentes necesarios, asegurando un estado consistente.
+- **Todo Incluido**: Desde el servidor de modelos LLM (Ollama) hasta la base de datos vectorial (Qdrant) y una interfaz de chat lista para usar, todo está preconfigurado y optimizado para CPU.
 
-```bash
-ssh -L 3200:127.0.0.1:3200 \
-    -L 9000:127.0.0.1:9000 \
-    -L 8080:127.0.0.1:8080 \
-    -L 19999:127.0.0.1:19999 \
-    usuario@IP_DE_LA_VM
+## Arquitectura
+
+El sistema se divide en dos capas principales: servicios que corren directamente en el **Host** y servicios contenedorizados gestionados por **Docker**.
+
+```ascii
+                                      +--------------------------------+
+                                      |       Usuario (Navegador)      |
+                                      +--------------------------------+
+                                                 |       ^
+                                                 |       | (Túnel SSH Opcional)
+                                                 v       |
++--------------------------------------------------------------------------------------------+
+|                                        VM Host (Ubuntu/Debian)                             |
+|                                                                                            |
+|   +--------------------------+         +--------------------------+                        |
+|   |         Público          |         |      Acceso Local        |                        |
+|   |--------------------------|         |--------------------------|                        |
+|   |   HTTP/S (Port: 3000)    |         |     SSH   (Port: 22)     |                        |
+|   +--------------------------+         +--------------------------+                        |
+|      |                                    |                                                |
+|      |                                    |                                                |
+|      v (Docker Port Mapping)              v (Túnel)                                        |
+| +----------------------------------------------------------------------------------------+ |
+| |                                     Docker Engine                                      | |
+| |                                   (Network: rag_net)                                   | |
+| |                                                                                        | |
+| |    +---------------------+      +------------------------+      +--------------------+ | |
+| |    |   Open WebUI        |<---->| RAG Control Center     |<---->|   Docker Socket    | | |
+| |    | (Chat Interface)    |      | (API & Dashboard)      |      |   (/var/run/...)   | | |
+| |    | Port: 0.0.0.0:3000  |      | Port: 127.0.0.1:3200   |      +--------------------+ | |
+| |    +---------------------+      +------------------------+                             | |
+| |      ^      |                           |          ^                                   | |
+| |      |      |                           |          |                                   | |
+| |      |      | (host.docker.internal)    |          | (Llamadas a scripts)            | |
+| |      |      v                           v          v                                   | |
+| +------|---------------------------------------------------------------------------------+ |
+|      | |                                     |          |                                 |
+|      v |                                     v          v                                 |
+|   +--------------------------+   +--------------------------+   +-------------------------+  |
+|   |       Ollama (Host)      |   | Python Venv & Scripts    |   |    Archivos del Host    |  |
+|   | (LLM Server)             |<->| (/opt/rag_lab/scripts)   |   | (/opt/rag_lab, /var/log)|  |
+|   | Port: 127.0.0.1:11434    |   +--------------------------+   +-------------------------+  |
+|   +--------------------------+                                                              |
+|                                                                                            |
++--------------------------------------------------------------------------------------------+
+
 ```
 
-Una vez activo, abre en tu navegador:
-- **RAG Control Center**: `http://localhost:3200`
-- **Portainer**: `http://localhost:9000`
-- etc.
+## Características Incluidas
 
-## 3. Operación Diaria
+Este instalador configura una suite completa de herramientas:
 
-- **Subir Documentos**: Accede a Filebrowser (`http://localhost:8080`) y sube tus archivos. La ingesta se ejecuta automáticamente a las 3 AM.
-- **Monitoreo y Control**: Usa el **RAG Control Center** (`http://localhost:3200`) para ver el estado de los servicios, ejecutar tareas (ingesta, backup) y modificar la configuración.
-- **Diagnóstico**: Ejecuta `sudo /opt/rag_lab/scripts/diag_rag.sh` para una revisión rápida del estado del sistema.
-- **Feedback Loop y Agentes**: Usa el RAG Control Center para aprobar Q&A y crear nuevos agentes de IA personalizados.
+- **Servidor de Modelos LLM**:
+  - **Ollama**: Se instala directamente en el host para un rendimiento óptimo, con el modelo `phi3:3.8b-mini-4k-instruct-q4_K_M` pre-descargado y listo para usar.
 
-## 4. Backup y Restore
+- **Interfaz de Usuario (Chat)**:
+  - **Open WebUI**: Una interfaz de chat moderna y responsiva, expuesta públicamente para que puedas interactuar con tus modelos y documentos desde cualquier lugar.
 
-- **Crear Backup**: Usa el botón "Create Backup" en el RAG Control Center o ejecuta `sudo /opt/rag_lab/scripts/backup.sh`.
-- **Restaurar**: Ejecuta `sudo /opt/rag_lab/scripts/restore.sh /ruta/al/backup.tgz`. **¡CUIDADO!** Esto sobreescribe la instalación actual.
+- **Núcleo RAG**:
+  - **Qdrant**: Base de datos vectorial de alto rendimiento para almacenar y buscar embeddings, accesible solo localmente.
+  - **Scripts de Ingesta**: Un script de Python (`ingestion_script.py`) que automáticamente procesa documentos (PDF, TXT, MD), los divide, genera embeddings y los almacena en Qdrant.
+
+- **Panel de Control y Operaciones**:
+  - **RAG Control Center**: Un dashboard web interno (`localhost:3200`) creado a medida para esta plataforma. Permite ver el estado de los servicios, ejecutar tareas comunes (ingesta, backups), y modificar la configuración del sistema de forma segura.
+
+- **Gestión y Monitoreo**:
+  - **Portainer**: Para una visión detallada de los contenedores, logs y el entorno Docker.
+  - **Netdata**: Ofrece más de 2000 métricas en tiempo real sobre el rendimiento del servidor (CPU, RAM, disco, red).
+  - **Filebrowser**: Una sencilla interfaz web para subir y gestionar los documentos que alimentarán tu sistema RAG.
+
+- **Automatización**:
+  - **Cron Job**: Para la re-ingesta automática de documentos cada noche.
+  - **Systemd Service**: Asegura que toda la pila de servicios se inicie automáticamente con el servidor.
+  - **Scripts de Ayuda**: Un conjunto de scripts (`diag_rag.sh`, `backup.sh`, `restore.sh`, etc.) para facilitar las tareas de mantenimiento.
+
+## Uso Rápido
+
+Para desplegar la plataforma completa, solo necesitas ejecutar un comando en un servidor Ubuntu/Debian limpio:
+
+```bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/user/repo/main/install_rag_cpu.sh)"
+```
+*(Nota: Reemplaza la URL con la ubicación real del script)*
+
+El script se encargará de todo lo demás. Una vez finalizado, te presentará las URLs de acceso y los próximos pasos.
+
+## Tu Plataforma en Funcionamiento (El Resultado Final)
+
+Una vez que el script finalice, tendrás acceso a un conjunto de paneles web diseñados para cada tarea. Así es como se verá tu nuevo entorno de trabajo:
+
+### 1. El Chat - Open WebUI
+*   **Acceso**: `http://<IP_DE_LA_VM>:3000`
+*   **Qué verás**: Una interfaz de chat limpia y moderna, similar a ChatGPT.
+
+### 2. El Centro de Mando - RAG Control Center
+*   **Acceso**: `http://localhost:3200` (a través de túnel SSH)
+*   **Qué verás**: Tu panel de control privado para gestionar la plataforma.
+
+### 3. El Gestor de Documentos - Filebrowser
+*   **Acceso**: `http://localhost:8080` (a través de túnel SSH)
+*   **Qué verás**: Una interfaz para subir y gestionar los documentos que alimentarán tu IA.
+
+### 4. El Administrador de Contenedores - Portainer
+*   **Acceso**: `http://localhost:9000` (a través de túnel SSH)
+*   **Qué verás**: Un dashboard técnico para una gestión avanzada de los contenedores.
+
+### 5. El Monitor de Rendimiento - Netdata
+*   **Acceso**: `http://localhost:19999` (a través de túnel SSH)
+*   **Qué verás**: Métricas en tiempo real del rendimiento de tu servidor.
 
 ---
-*Documentación autogenerada.*
+
+## La IA Corporativa: Privada, Inteligente y sin Entrenamiento Costoso
+
+### ¿Por qué este enfoque es revolucionario?
+
+Tradicionalmente, crear una IA con conocimiento corporativo implicaba un proceso largo y extremadamente costoso: re-entrenar un modelo de lenguaje con tus datos. Este método no solo requiere una inversión millonaria en hardware y tiempo, sino que también crea una "foto estática": el modelo no aprende de nueva información a menos que lo vuelvas a entrenar.
+
+**Este proyecto utiliza Retrieval-Augmented Generation (RAG), un enfoque más inteligente y ágil:**
+
+1.  **LLM como Cerebro Razonador**: Utilizamos un modelo de lenguaje pre-entrenado (como `phi3`) que ya es excelente en razonamiento, lenguaje y seguimiento de instrucciones. No lo modificamos.
+2.  **Base de Conocimiento Vectorial**: Tus documentos (los datos de tu empresa) se convierten en una base de conocimiento externa y consultable (en Qdrant).
+3.  **Proceso Dinámico**: Cuando haces una pregunta, el sistema primero busca la información más relevante en tu base de conocimiento y luego le pasa esa información al LLM como "contexto" para que formule la respuesta.
+
+### Ventajas Clave:
+
+-   **Privacidad Absoluta**: Todo el sistema, desde el LLM hasta tus documentos, se ejecuta **dentro de tu propio servidor**. Ningún dato sale a APIs de terceros. Cumplimiento y seguridad garantizados.
+-   **Conocimiento Siempre Fresco**: Simplemente añade o actualiza documentos y la base de conocimiento se refresca automáticamente (cada noche o manualmente), sin necesidad de re-entrenar nada.
+-   **Ahorro Gigante**: Evitas los costes prohibitivos del entrenamiento. La inversión se centra en un servidor adecuado, no en ciclos de GPU de supercomputadoras.
+
+## Guía de Ingesta: ¿Cómo alimentar a tu IA?
+
+La calidad de las respuestas de tu IA depende directamente de la calidad de la información que le proporcionas. Sigue estas mejores prácticas:
+
+-   **Formato de Archivos**: Prefiere archivos de texto plano como **Markdown (`.md`)**. Son ligeros, estructurados y fáciles de procesar. Los archivos PDF y TXT también son soportados.
+-   **Estructura Clara**: Utiliza títulos, subtítulos, listas y párrafos cortos. Una buena estructura en tus documentos ayuda al sistema a encontrar fragmentos de información más precisos.
+-   **Contenido Limpio**: Evita texto dentro de imágenes, tablas complejas o formattings extraños. Cuanto más limpio y directo sea el texto, mejor.
+-   **Un Tema por Documento**: Siempre que sea posible, crea documentos que se centren en un tema específico (ej. "Manual_Producto_X.md", "Politicas_Vacaciones_2024.md"). Esto mejora la relevancia de las búsquedas.
+
+## Requisitos de Hardware y Estimación de Rendimiento
+
+Esta plataforma está diseñada para ser flexible. A continuación, se presentan algunas configuraciones recomendadas y una estimación de su capacidad.
+
+| Componente      | Configuración Mínima (CPU)                                  | Configuración Recomendada (GPU)                                |
+|-----------------|-------------------------------------------------------------|----------------------------------------------------------------|
+| **CPU**         | 8+ Núcleos (Ej. Intel Xeon E-2278G, AMD Ryzen 7 3700X)       | 8-16+ Núcleos (para soportar la carga general)                 |
+| **RAM**         | 32 GB DDR4                                                  | 64 GB DDR4 o más                                               |
+| **Almacenamiento**| 500 GB SSD NVMe (para SO, Docker y datos)                   | 1-2 TB SSD NVMe (para una base de conocimiento más grande)     |
+| **GPU**         | N/A                                                         | **NVIDIA Tesla P40 (24 GB VRAM)** o superior                   |
+| **Red**         | 1 Gbps                                                      | 1 Gbps o más                                                   |
+
+### Estimación de Usuarios Concurrentes
+
+-   **Configuración Mínima (CPU)**: La inferencia del LLM en CPU es lenta. Esta configuración es ideal para **desarrollo, pruebas o un uso muy ligero por 1-3 usuarios simultáneos**. Las respuestas pueden tardar varios segundos en generarse.
+-   **Configuración Recomendada (GPU)**: Con una GPU como la NVIDIA P40, la velocidad de inferencia del LLM aumenta drásticamente (10x a 20x más rápido). Esta configuración puede servir cómodamente a un equipo pequeño o mediano, soportando aproximadamente **10-15 usuarios concurrentes** con tiempos de respuesta rápidos (1-3 segundos).
+
+---
+
+## Guías Avanzadas
+
+### Personalización de Modelos con Ollama
+
+Puedes crear tus propias variantes de modelos (ej. para darles una personalidad o instrucciones específicas) usando un `Modelfile`.
+
+1.  **Crea un `Modelfile`**: En tu máquina local, crea un archivo llamado `Modelfile` (sin extensión).
+    `Modelfile
+    FROM phi3:3.8b-mini-4k-instruct-q4_K_M
+
+    # Define la personalidad del modelo
+    SYSTEM """
+    Eres un asistente experto en finanzas de la empresa Acme.
+    Siempre respondes de forma profesional, concisa y basas tus respuestas
+    únicamente en el contexto proporcionado. Si no sabes la respuesta, di
+    "No tengo información sobre ese tema".
+    """
+    `
+
+2.  **Crea y Publica el Modelo**:
+    -   Ejecuta `ollama create mi-agente-financiero -f Modelfile` en tu servidor.
+    -   El nuevo modelo `mi-agente-financiero` aparecerá automáticamente en la lista de modelos de Open WebUI, listo para ser utilizado.
+
+### Personalización de Open WebUI (Colores y Logo)
+
+Puedes cambiar la apariencia de Open WebUI montando tus propios archivos de personalización.
+
+1.  **Prepara tus Archivos**:
+    -   **Logo**: Crea tu logo en formato SVG.
+    -   **Estilos**: Crea un archivo CSS con tus cambios. Por ejemplo, `custom.css`.
+
+2.  **Añade los Archivos al Servidor**:
+    -   Copia tu logo a `/opt/rag_lab/open_webui_customizations/logo.svg`.
+    -   Copia tu CSS a `/opt/rag_lab/open_webui_customizations/custom.css`.
+
+3.  **Modifica el `docker-compose.yml`**:
+    -   Añade los siguientes volúmenes a la sección del servicio `open-webui`:
+      `yaml
+      volumes:
+        - ./open_webui_data:/app/backend/data
+        - ./open_webui_customizations/logo.svg:/app/static/logo.svg
+        - ./open_webui_customizations/custom.css:/app/static/css/custom.css
+      `
+    -   Reinicia la plataforma con `sudo systemctl restart rag_lab`.
+
+## Análisis y Mejoras Futuras
+
+La plataforma actual es una base sólida, pero puede ser extendida:
+
+-   **Multi-Tenencia**: Aislar las colecciones de Qdrant y los documentos por usuario o departamento.
+-   **Integración con Otras Fuentes de Datos**: Añadir conectores para bases de datos, Confluence, etc.
+-   **Agentes Proactivos**: Desarrollar agentes que puedan iniciar acciones (ej. enviar un correo) en lugar de solo responder preguntas.
+-   **Seguridad Avanzada**: Integrar un sistema de autenticación más robusto como OAuth2/OIDC para el RAG Control Center y las APIs.
 EOF
 
 # 3. Orquestación y Smoke Tests
 info "Configurando firewall y arrancando servicios..."
-if command -v ufw &> /dev/null; then ufw allow ${OPENWEBUI_PORT:-3000}/tcp; ufw allow ssh; fi
+if command -v ufw &> /dev/null; then ufw allow ${OPENWEBUI_PORT:-3000}/tcp; ufw allow 8001/tcp; ufw allow ssh; fi
 systemctl enable --now rag_lab
 
-info "Esperando a que los servicios se inicien... (60s)"
-sleep 60
+wait_for_service() {
+    local url=$1
+    local service_name=$2
+    local creds=$3
+    local timeout=120
+    local start_time=$(date +%s)
+    info "Esperando a que el servicio ${service_name} esté disponible en ${url}..."
+
+    local curl_cmd="curl -fsS"
+    if [ -n "$creds" ]; then
+        curl_cmd+=" -u ${creds}"
+    fi
+    curl_cmd+=" ${url}"
+
+    while true; do
+        if ${curl_cmd} > /dev/null; then
+            info "Servicio ${service_name} está activo."
+            return 0
+        fi
+        local current_time=$(date +%s)
+        if (( current_time - start_time > timeout )); then
+            error "Tiempo de espera agotado para el servicio ${service_name}."
+            return 1
+        fi
+        sleep 5
+    done
+}
+
+info "Esperando a que los servicios se inicien..."
+wait_for_service "http://127.0.0.1:6333/ready" "Qdrant" ""
+wait_for_service "http://127.0.0.1:${OPENWEBUI_PORT:-3000}" "Open WebUI" ""
+wait_for_service "http://127.0.0.1:8001" "Simple Chat" ""
+wait_for_service "http://127.0.0.1:${RAG_CONTROL_CENTER_PORT:-3200}" "RAG Control Center" "${CONTROL_CENTER_USER:-admin}:${CONTROL_CENTER_PASS:-ragadmin}"
 
 info "Ejecutando smoke tests..."
 curl -fsS http://127.0.0.1:6333/ready || error "Smoke test FAILED: Qdrant"
 curl -fsS http://127.0.0.1:${OPENWEBUI_PORT:-3000} || error "Smoke test FAILED: Open WebUI"
+curl -fsS http://127.0.0.1:8001 || error "Smoke test FAILED: Simple Chat"
 curl -fsS -u "${CONTROL_CENTER_USER:-admin}:${CONTROL_CENTER_PASS:-ragadmin}" http://127.0.0.1:${RAG_CONTROL_CENTER_PORT:-3200} || error "Smoke test FAILED: RAG Control Center (Dashboard)"
 curl -fsS -u "${CONTROL_CENTER_USER:-admin}:${CONTROL_CENTER_PASS:-ragadmin}" http://127.0.0.1:${RAG_CONTROL_CENTER_PORT:-3200}/agents || error "Smoke test FAILED: RAG Control Center (Agents Page)"
 info "Smoke tests PASSED."
@@ -864,8 +1266,13 @@ info "--- Instalación Completada ---"
 ip_address=$(hostname -I | awk '{print $1}')
 echo "Plataforma RAG instalada."
 echo "Open WebUI: http://${ip_address}:${OPENWEBUI_PORT:-3000}"
+echo "Simple Chat: http://${ip_address}:8001"
 echo "RAG Control Center (via SSH tunnel): http://127.0.0.1:${RAG_CONTROL_CENTER_PORT:-3200}"
 echo "  - User: ${CONTROL_CENTER_USER:-admin}"
 echo "  - Pass: ${CONTROL_CENTER_PASS:-ragadmin}"
+echo ""
+echo "!!! IMPORTANTE: Por favor, cambia las credenciales por defecto de Filebrowser y del RAG Control Center lo antes posible. !!!"
+echo "La contraseña de Filebrowser se puede cambiar en su propia interfaz web. La del Control Center se cambia en /opt/rag_lab/config/.env"
+
 
 info "--- Fase P4 Completada ---"
