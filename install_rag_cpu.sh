@@ -139,6 +139,8 @@ mkdir -p "${RAG_LAB_DIR}/scripts"
 mkdir -p "${RAG_LAB_DIR}/logs"
 mkdir -p "${RAG_LAB_DIR}/config"
 mkdir -p "${RAG_LAB_DIR}/control_center/templates"
+mkdir -p "${RAG_LAB_DIR}/documents/knowledge_base"
+mkdir -p "${RAG_LAB_DIR}/scripts/agents"
 
 # 2. Generar Archivos de Configuración
 info "Generando archivos de configuración..."
@@ -416,6 +418,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from dotenv import dotenv_values, set_key
+import datetime
 
 app = FastAPI()
 security = HTTPBasic()
@@ -424,6 +427,11 @@ templates = Jinja2Templates(directory="/opt/rag_lab/control_center/templates")
 RAG_LAB_DIR = "/opt/rag_lab"
 SCRIPTS_DIR = os.path.join(RAG_LAB_DIR, "scripts")
 ENV_FILE = os.path.join(RAG_LAB_DIR, "config/.env")
+KNOWLEDGE_BASE_DIR = os.path.join(RAG_LAB_DIR, "documents", "knowledge_base")
+
+# --- Estado Simulado en Memoria ---
+# En una app real, esto sería una base de datos.
+recent_queries = []
 
 # --- Autenticación ---
 def get_current_user(credentials: HTTPBasicCredentials = Depends(security)):
@@ -453,7 +461,111 @@ def read_root(request: Request, user: str = Depends(get_current_user)):
         "request": request,
         "containers": container_statuses,
         "env_config": env_config,
+        "recent_queries": recent_queries
     })
+
+@app.post("/simulated-query")
+async def simulated_query(query: str = Form(...), user: str = Depends(get_current_user)):
+    # Simulación de una respuesta de agente
+    answer = f"Esta es una respuesta simulada para la pregunta: '{query}'. En un sistema real, esta respuesta vendría del LLM."
+    recent_queries.append({"query": query, "answer": answer, "id": len(recent_queries)})
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/approve-qa/{query_id}")
+async def approve_qa(query_id: int, user: str = Depends(get_current_user)):
+    if query_id >= len(recent_queries):
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    qa = recent_queries[query_id]
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    filename = os.path.join(KNOWLEDGE_BASE_DIR, f"qa_{timestamp}.md")
+
+    with open(filename, "w") as f:
+        f.write(f"# Pregunta: {qa['query']}\n\n")
+        f.write(f"## Respuesta Aprobada:\n{qa['answer']}\n")
+
+    # Opcional: eliminar de la lista de recientes una vez aprobado
+    # recent_queries.pop(query_id)
+
+    return RedirectResponse(url="/", status_code=303)
+
+AGENT_TEMPLATE = """#!/usr/bin/env python
+import os, sys
+from qdrant_client import QdrantClient
+from sentence_transformers import SentenceTransformer
+import ollama
+
+# --- Agente Personalizado: {agent_name} ---
+# Propósito: {agent_purpose}
+
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-small")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:3.8b-mini-4k-instruct-q4_K_M")
+OLLAMA_HOST = f"http://{os.getenv('OLLAMA_BIND', '127.0.0.1')}:11434"
+RAG_COLLECTION = os.getenv("RAG_COLLECTION", "corporativo_rag")
+
+PROMPT_TEMPLATE = \"\"\"
+{system_prompt}
+
+Contexto:
+{{context}}
+
+Pregunta:
+{{query}}
+
+Respuesta:
+\"\"\"
+
+def main():
+    if len(sys.argv) < 2: sys.exit(f"Uso: python {os.path.basename(__file__)} \\"<pregunta>\\"")
+
+    embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+    qdrant_client = QdrantClient(host="127.0.0.1", port=6333)
+    ollama_client = ollama.Client(host=OLLAMA_HOST)
+
+    query_vector = embedding_model.encode(sys.argv[1]).tolist()
+    results = qdrant_client.search(collection_name=RAG_COLLECTION, query_vector=query_vector, limit=3)
+
+    context = "\\n---\\n".join([r.payload['text'] for r in results]) if results else "No se encontró información relevante."
+    prompt = PROMPT_TEMPLATE.format(context=context, query=sys.argv[1])
+
+    response = ollama_client.chat(model=OLLAMA_MODEL, messages=[{'role': 'user', 'content': prompt}])
+    print(response['message']['content'])
+
+if __name__ == "__main__":
+    main()
+"""
+
+@app.get("/agents", response_class=HTMLResponse)
+def agent_creator_page(request: Request, user: str = Depends(get_current_user)):
+    agents = []
+    agents_dir = os.path.join(SCRIPTS_DIR, "agents")
+    if os.path.exists(agents_dir):
+        agents = [f for f in os.listdir(agents_dir) if f.endswith(".py")]
+    return templates.TemplateResponse("agents.html", {"request": request, "agents": agents})
+
+@app.post("/create-agent")
+async def create_agent(
+    agent_name: str = Form(...),
+    agent_purpose: str = Form(...),
+    system_prompt: str = Form(...),
+    user: str = Depends(get_current_user)
+):
+    agent_filename = f"agent_{agent_name.lower().replace(' ', '_')}.py"
+    agent_path = os.path.join(SCRIPTS_DIR, "agents", agent_filename)
+
+    agent_code = AGENT_TEMPLATE.format(
+        agent_name=agent_name,
+        agent_purpose=agent_purpose,
+        system_prompt=system_prompt
+    )
+
+    with open(agent_path, "w") as f:
+        f.write(agent_code)
+
+    os.chmod(agent_path, 0o755)
+
+    return RedirectResponse(url="/agents", status_code=303)
+
 
 @app.post("/run-script/{script_name}")
 async def run_script(script_name: str, user: str = Depends(get_current_user)):
@@ -489,11 +601,59 @@ cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/base.html"
 </head>
 <body class="bg-gray-100 text-gray-800">
     <div class="container mx-auto p-4">
-        <h1 class="text-3xl font-bold mb-4">RAG Control Center</h1>
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-3xl font-bold">RAG Control Center</h1>
+            <nav>
+                <a href="/" class="text-blue-500 hover:underline">Dashboard</a> |
+                <a href="/agents" class="text-blue-500 hover:underline">Agent Creator</a>
+            </nav>
+        </div>
         {% block content %}{% endblock %}
     </div>
 </body>
 </html>
+EOF
+
+cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/agents.html"
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Creador de Agentes -->
+    <div class="bg-white p-4 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-2">Create a New Agent</h2>
+        <form action="/create-agent" method="post" class="flex flex-col space-y-3">
+            <div>
+                <label for="agent_name" class="block text-sm font-medium">Agent Name</label>
+                <input type="text" name="agent_name" id="agent_name" placeholder="Ej: Agente de Soporte Técnico" class="w-full p-2 border rounded">
+            </div>
+            <div>
+                <label for="agent_purpose" class="block text-sm font-medium">Purpose</label>
+                <input type="text" name="agent_purpose" id="agent_purpose" placeholder="Ej: Responde preguntas sobre el manual del producto X" class="w-full p-2 border rounded">
+            </div>
+            <div>
+                <label for="system_prompt" class="block text-sm font-medium">System Prompt / Personality</label>
+                <textarea name="system_prompt" id="system_prompt" rows="4" class="w-full p-2 border rounded" placeholder="Ej: Eres un asistente amigable y experto en el producto X..."></textarea>
+            </div>
+            <button type="submit" class="bg-blue-500 text-white p-2 rounded">Create Agent</button>
+        </form>
+    </div>
+
+    <!-- Agentes Existentes -->
+    <div class="bg-white p-4 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-2">Existing Agents</h2>
+        <ul>
+            {% for agent in agents %}
+            <li class="border-t py-2">
+                <p><strong>{{ agent }}</strong></p>
+                <p class="text-sm text-gray-500">Uso: `sudo /opt/rag_lab/venv/bin/python /opt/rag_lab/scripts/agents/{{ agent }} "tu pregunta"`</p>
+            </li>
+            {% else %}
+            <li>No agents created yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}
 EOF
 
 cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/index.html"
@@ -536,6 +696,31 @@ cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/index.html"
             </div>
             <button type="submit" class="mt-4 bg-indigo-500 text-white p-2 rounded">Save & Restart Services</button>
         </form>
+    </div>
+
+    <!-- Feedback Loop -->
+    <div class="bg-white p-4 rounded-lg shadow col-span-1 md:col-span-2">
+        <h2 class="text-xl font-semibold mb-2">Feedback Loop & Learning</h2>
+        <div class="mb-4">
+            <form action="/simulated-query" method="post">
+                <input type="text" name="query" class="w-full p-2 border rounded" placeholder="Escribe una pregunta de prueba...">
+                <button type="submit" class="mt-2 bg-gray-500 text-white p-2 rounded">Simular Consulta</button>
+            </form>
+        </div>
+        <div>
+            <h3 class="text-lg font-semibold mb-2">Consultas Recientes</h3>
+            {% for qa in recent_queries %}
+            <div class="border-t py-2">
+                <p><strong>P:</strong> {{ qa.query }}</p>
+                <p><strong>R:</strong> {{ qa.answer }}</p>
+                <form action="/approve-qa/{{ qa.id }}" method="post" class="mt-1">
+                    <button type="submit" class="bg-green-600 text-white px-2 py-1 rounded text-sm">Aprobar y Añadir a Base de Conocimiento</button>
+                </form>
+            </div>
+            {% else %}
+            <p>No hay consultas recientes.</p>
+            {% endfor %}
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -648,6 +833,7 @@ Una vez activo, abre en tu navegador:
 - **Subir Documentos**: Accede a Filebrowser (`http://localhost:8080`) y sube tus archivos. La ingesta se ejecuta automáticamente a las 3 AM.
 - **Monitoreo y Control**: Usa el **RAG Control Center** (`http://localhost:3200`) para ver el estado de los servicios, ejecutar tareas (ingesta, backup) y modificar la configuración.
 - **Diagnóstico**: Ejecuta `sudo /opt/rag_lab/scripts/diag_rag.sh` para una revisión rápida del estado del sistema.
+- **Feedback Loop y Agentes**: Usa el RAG Control Center para aprobar Q&A y crear nuevos agentes de IA personalizados.
 
 ## 4. Backup y Restore
 
@@ -669,7 +855,8 @@ sleep 60
 info "Ejecutando smoke tests..."
 curl -fsS http://127.0.0.1:6333/ready || error "Smoke test FAILED: Qdrant"
 curl -fsS http://127.0.0.1:${OPENWEBUI_PORT:-3000} || error "Smoke test FAILED: Open WebUI"
-curl -fsS -u "${CONTROL_CENTER_USER:-admin}:${CONTROL_CENTER_PASS:-ragadmin}" http://127.0.0.1:${RAG_CONTROL_CENTER_PORT:-3200} || error "Smoke test FAILED: RAG Control Center"
+curl -fsS -u "${CONTROL_CENTER_USER:-admin}:${CONTROL_CENTER_PASS:-ragadmin}" http://127.0.0.1:${RAG_CONTROL_CENTER_PORT:-3200} || error "Smoke test FAILED: RAG Control Center (Dashboard)"
+curl -fsS -u "${CONTROL_CENTER_USER:-admin}:${CONTROL_CENTER_PASS:-ragadmin}" http://127.0.0.1:${RAG_CONTROL_CENTER_PORT:-3200}/agents || error "Smoke test FAILED: RAG Control Center (Agents Page)"
 info "Smoke tests PASSED."
 
 # 4. Mensaje Final
