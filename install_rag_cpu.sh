@@ -985,233 +985,120 @@ EOF
 # 2. Generar README.md final
 info "Generando README.md final..."
 cat <<'EOF' > "${RAG_LAB_DIR}/README.md"
-# Prompt Maestro 3.0 — Instalador de Plataforma RAG en CPU
-
-## Visión General
-
-**Prompt Maestro 3.0** es un instalador autocontenido que despliega una plataforma completa de **Retrieval-Augmented Generation (RAG)** en una máquina Ubuntu/Debian con CPU en cuestión de minutos. Con un solo comando, transforma un servidor "vacío" en un entorno de desarrollo de agentes de IA potente, seguro y listo para producción.
-
-Este proyecto nace de la necesidad de estandarizar y acelerar la creación de entornos RAG, eliminando la complejidad y las horas de configuración manual.
-
-## Beneficios Clave
-
-- **Velocidad de Despliegue**: Pasa de un servidor limpio a una plataforma RAG funcional en menos de 10 minutos. El script es 100% automatizado y no requiere intervención manual.
-- **Seguridad por Defecto**: La arquitectura expone públicamente solo la interfaz de chat (Open WebUI). Todos los paneles de gestión y servicios de datos son accesibles únicamente desde `localhost`, protegidos de accesos no autorizados y pensados para ser utilizados a través de un túnel SSH seguro.
-- **Observabilidad Integrada**: La plataforma incluye Portainer para la gestión de contenedores y Netdata para el monitoreo en tiempo real del host. Además, el **RAG Control Center** ofrece un dashboard centralizado para supervisar la salud del sistema y realizar operaciones comunes.
-- **Idempotente y Robusto**: Puedes ejecutar el script múltiples veces. No romperá nada; solo instalará o actualizará los componentes necesarios, asegurando un estado consistente.
-- **Todo Incluido**: Desde el servidor de modelos LLM (Ollama) hasta la base de datos vectorial (Qdrant) y una interfaz de chat lista para usar, todo está preconfigurado y optimizado para CPU.
-
-## Arquitectura
-
-El sistema se divide en dos capas principales: servicios que corren directamente en el **Host** y servicios contenedorizados gestionados por **Docker**.
-
-```ascii
-                                      +--------------------------------+
-                                      |       Usuario (Navegador)      |
-                                      +--------------------------------+
-                                                 |       ^
-                                                 |       | (Túnel SSH Opcional)
-                                                 v       |
-+--------------------------------------------------------------------------------------------+
-|                                        VM Host (Ubuntu/Debian)                             |
-|                                                                                            |
-|   +--------------------------+         +--------------------------+                        |
-|   |         Público          |         |      Acceso Local        |                        |
-|   |--------------------------|         |--------------------------|                        |
-|   |   HTTP/S (Port: 3000)    |         |     SSH   (Port: 22)     |                        |
-|   +--------------------------+         +--------------------------+                        |
-|      |                                    |                                                |
-|      |                                    |                                                |
-|      v (Docker Port Mapping)              v (Túnel)                                        |
-| +----------------------------------------------------------------------------------------+ |
-| |                                     Docker Engine                                      | |
-| |                                   (Network: rag_net)                                   | |
-| |                                                                                        | |
-| |    +---------------------+      +------------------------+      +--------------------+ | |
-| |    |   Open WebUI        |<---->| RAG Control Center     |<---->|   Docker Socket    | | |
-| |    | (Chat Interface)    |      | (API & Dashboard)      |      |   (/var/run/...)   | | |
-| |    | Port: 0.0.0.0:3000  |      | Port: 127.0.0.1:3200   |      +--------------------+ | |
-| |    +---------------------+      +------------------------+                             | |
-| |      ^      |                           |          ^                                   | |
-| |      |      |                           |          |                                   | |
-| |      |      | (host.docker.internal)    |          | (Llamadas a scripts)            | |
-| |      |      v                           v          v                                   | |
-| +------|---------------------------------------------------------------------------------+ |
-|      | |                                     |          |                                 |
-|      v |                                     v          v                                 |
-|   +--------------------------+   +--------------------------+   +-------------------------+  |
-|   |       Ollama (Host)      |   | Python Venv & Scripts    |   |    Archivos del Host    |  |
-|   | (LLM Server)             |<->| (/opt/rag_lab/scripts)   |   | (/opt/rag_lab, /var/log)|  |
-|   | Port: 127.0.0.1:11434    |   +--------------------------+   +-------------------------+  |
-|   +--------------------------+                                                              |
-|                                                                                            |
-+--------------------------------------------------------------------------------------------+
+# RGIA MASTER: Tu Plataforma de IA Corporativa Privada en Minutos
 
 ```
-
-## Características Incluidas
-
-Este instalador configura una suite completa de herramientas:
-
-- **Servidor de Modelos LLM**:
-  - **Ollama**: Se instala directamente en el host para un rendimiento óptimo, con el modelo `phi3:3.8b-mini-4k-instruct-q4_K_M` pre-descargado y listo para usar.
-
-- **Interfaz de Usuario (Chat)**:
-  - **Open WebUI**: Una interfaz de chat moderna y responsiva, expuesta públicamente para que puedas interactuar con tus modelos y documentos desde cualquier lugar.
-
-- **Núcleo RAG**:
-  - **Qdrant**: Base de datos vectorial de alto rendimiento para almacenar y buscar embeddings, accesible solo localmente.
-  - **Scripts de Ingesta**: Un script de Python (`ingestion_script.py`) que automáticamente procesa documentos (PDF, TXT, MD), los divide, genera embeddings y los almacena en Qdrant.
-
-- **Panel de Control y Operaciones**:
-  - **RAG Control Center**: Un dashboard web interno (`localhost:3200`) creado a medida para esta plataforma. Permite ver el estado de los servicios, ejecutar tareas comunes (ingesta, backups), y modificar la configuración del sistema de forma segura.
-
-- **Gestión y Monitoreo**:
-  - **Portainer**: Para una visión detallada de los contenedores, logs y el entorno Docker.
-  - **Netdata**: Ofrece más de 2000 métricas en tiempo real sobre el rendimiento del servidor (CPU, RAM, disco, red).
-  - **Filebrowser**: Una sencilla interfaz web para subir y gestionar los documentos que alimentarán tu sistema RAG.
-
-- **Automatización**:
-  - **Cron Job**: Para la re-ingesta automática de documentos cada noche.
-  - **Systemd Service**: Asegura que toda la pila de servicios se inicie automáticamente con el servidor.
-  - **Scripts de Ayuda**: Un conjunto de scripts (`diag_rag.sh`, `backup.sh`, `restore.sh`, etc.) para facilitar las tareas de mantenimiento.
-
-## Uso Rápido
-
-Para desplegar la plataforma completa, solo necesitas ejecutar un comando en un servidor Ubuntu/Debian limpio:
-
-```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/user/repo/main/install_rag_cpu.sh)"
+██████╗  ██████╗ ██╗ █████╗     ███╗   ███╗ █████╗ ███████╗████████╗██████╗
+██╔══██╗██╔════╝ ██║██╔══██╗    ████╗ ████║██╔══██╗██╔════╝╚══██╔══╝██╔══██╗
+██████╔╝██║  ███╗██║███████║    ██╔████╔██║███████║███████╗   ██║   ██████╔╝
+██╔══██╗██║   ██║██║██╔══██║    ██║╚██╔╝██║██╔══██║╚════██║   ██║   ██╔══██╗
+██║  ██║╚██████╔╝██║██║  ██║    ██║ ╚═╝ ██║██║  ██║███████║   ██║   ██║  ██║
+╚═╝  ╚═╝ ╚═════╝ ╚═╝╚═╝  ╚═╝    ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝
 ```
-*(Nota: Reemplaza la URL con la ubicación real del script)*
+*Hecho por Luis Fajardo Rivera (lmfr)*
 
-El script se encargará de todo lo demás. Una vez finalizado, te presentará las URLs de acceso y los próximos pasos.
+---
 
-## Tu Plataforma en Funcionamiento (El Resultado Final)
+**¡Bienvenido a RGIA MASTER!**
 
-Una vez que el script finalice, tendrás acceso a un conjunto de paneles web diseñados para cada tarea. Así es como se verá tu nuevo entorno de trabajo:
+¿Alguna vez has imaginado tener una inteligencia artificial, como ChatGPT, que conozca tu negocio al detalle y opere exclusivamente para ti, con total privacidad y seguridad?
 
-### 1. El Chat - Open WebUI
+**RGIA MASTER** hace exactamente eso. Esta plataforma transforma un servidor Ubuntu/Debian estándar en un cerebro corporativo privado. Con un solo comando, despliegas un ecosistema completo que "lee" tus documentos —manuales, políticas, reportes, bases de conocimiento— y los convierte en una base de conocimiento interactiva.
+
+**El resultado es simple y poderoso:** puedes hacerle preguntas complejas en lenguaje natural y recibir respuestas precisas, basadas únicamente en tu propia información. Todo esto ocurre dentro de tu servidor, garantizando que tus datos sensibles nunca salgan de tu control.
+
+Este proyecto fue diseñado para ser la forma más rápida y robusta de construir y gestionar un entorno de **Retrieval-Augmented Generation (RAG)**, poniendo el poder de la IA generativa en tus manos.
+
+## 🚀 Características Principales
+
+| Característica | Descripción |
+| :--- | :--- |
+| ** despliegue ultrarrápido** | De servidor limpio a plataforma RAG funcional en menos de 10 minutos. |
+| **🛡️ Seguridad por Defecto** | Solo las interfaces de chat son públicas. El resto es 100% local. |
+| **📊 Observabilidad Integrada** | Paneles para monitorear el estado del sistema y la actividad de los contenedores. |
+| **⚙️ Gestión Centralizada** | El **RAG Control Center** te da un mando único para operar la plataforma. |
+| **🔄 Idempotente y Robusto** | Puedes ejecutar el instalador múltiples veces sin riesgo de romper nada. |
+
+##  tour visual por tu nueva plataforma
+
+Una vez finalizada la instalación, tendrás acceso a un conjunto de herramientas web. Así es como se ve tu nuevo centro de mando:
+
+### 1. 💬 El Chat Principal - Open WebUI
 *   **Acceso**: `http://<IP_DE_LA_VM>:3000`
-*   **Qué verás**: Una interfaz de chat limpia y moderna, similar a ChatGPT.
+*   **Tu Experiencia**: Una interfaz de chat moderna y completa, similar a ChatGPT, donde puedes elegir modelos, ver el historial de conversaciones y tener una experiencia de diálogo rica.
 
-### 2. El Centro de Mando - RAG Control Center
+### 2. ✨ El Chat Directo - Simple Chat
+*   **Acceso**: `http://<IP_DE_LA_VM>:8001`
+*   **Tu Experiencia**: Una interfaz de chat minimalista y ultrarrápida, ideal para integraciones o para tener conversaciones directas sin distracciones.
+
+### 3. 🕹️ El Centro de Mando - RAG Control Center
 *   **Acceso**: `http://localhost:3200` (a través de túnel SSH)
-*   **Qué verás**: Tu panel de control privado para gestionar la plataforma.
+*   **Tu Experiencia**: Tu panel de control privado. Desde aquí puedes:
+    *   Ver el estado de todos los servicios.
+    *   Ejecutar la ingesta de documentos manualmente.
+    *   Crear nuevos agentes de IA con personalidades y propósitos específicos.
+    *   Revisar y aprobar preguntas y respuestas para mejorar la base de conocimiento.
+    *   Gestionar la configuración del sistema.
 
-### 3. El Gestor de Documentos - Filebrowser
+### 4. 📂 El Gestor de Documentos - Filebrowser
 *   **Acceso**: `http://localhost:8080` (a través de túnel SSH)
-*   **Qué verás**: Una interfaz para subir y gestionar los documentos que alimentarán tu IA.
+*   **Tu Experiencia**: Una interfaz simple para arrastrar y soltar los documentos que alimentarán a tu IA.
 
-### 4. El Administrador de Contenedores - Portainer
+### 5. 🐳 El Administrador de Contenedores - Portainer
 *   **Acceso**: `http://localhost:9000` (a través de túnel SSH)
-*   **Qué verás**: Un dashboard técnico para una gestión avanzada de los contenedores.
+*   **Tu Experiencia**: Un dashboard técnico avanzado para ver los logs de los contenedores, su consumo de recursos y gestionar el entorno Docker.
 
-### 5. El Monitor de Rendimiento - Netdata
+### 6. 📈 El Monitor de Rendimiento - Netdata
 *   **Acceso**: `http://localhost:19999` (a través de túnel SSH)
-*   **Qué verás**: Métricas en tiempo real del rendimiento de tu servidor.
+*   **Tu Experiencia**: Métricas en tiempo real sobre la salud de tu servidor: CPU, RAM, disco, red y más.
 
----
+## ✅ Calidad y Pruebas (QA)
 
-## La IA Corporativa: Privada, Inteligente y sin Entrenamiento Costoso
+La robustez de esta plataforma es una prioridad. El script de instalación ha pasado por múltiples ciclos de revisión para corregir errores y mejorar la arquitectura. Al final de la instalación, se ejecutan **smoke tests** automáticos que validan que cada componente principal esté en línea y funcionando.
 
-### ¿Por qué este enfoque es revolucionario?
+## 🛡️ Arquitectura de Seguridad
 
-Tradicionalmente, crear una IA con conocimiento corporativo implicaba un proceso largo y extremadamente costoso: re-entrenar un modelo de lenguaje con tus datos. Este método no solo requiere una inversión millonaria en hardware y tiempo, sino que también crea una "foto estática": el modelo no aprende de nueva información a menos que lo vuelvas a entrenar.
+La seguridad no es una opción, es la base del diseño:
+*   **Exposición Mínima**: Solo los componentes que necesitan ser accedidos por los usuarios finales (las interfaces de chat) están expuestos a la red pública.
+*   **Aislamiento de Servicios**: Todos los servicios de gestión, datos y monitoreo operan en `localhost`. El acceso remoto a estos paneles se realiza de forma segura a través de un **túnel SSH**, evitando exponer puertos sensibles a internet.
+*   **Credenciales**: Al finalizar la instalación, se te recuerda de forma prominente que debes cambiar las contraseñas por defecto para asegurar tu entorno.
 
-**Este proyecto utiliza Retrieval-Augmented Generation (RAG), un enfoque más inteligente y ágil:**
+## 🙏 Agradecimientos y Tecnologías Open Source
 
-1.  **LLM como Cerebro Razonador**: Utilizamos un modelo de lenguaje pre-entrenado (como `phi3`) que ya es excelente en razonamiento, lenguaje y seguimiento de instrucciones. No lo modificamos.
-2.  **Base de Conocimiento Vectorial**: Tus documentos (los datos de tu empresa) se convierten en una base de conocimiento externa y consultable (en Qdrant).
-3.  **Proceso Dinámico**: Cuando haces una pregunta, el sistema primero busca la información más relevante en tu base de conocimiento y luego le pasa esa información al LLM como "contexto" para que formule la respuesta.
+Esta plataforma no sería posible sin el increíble trabajo de la comunidad de código abierto. Extendemos nuestro agradecimiento a los equipos detrás de estos proyectos fundamentales:
 
-### Ventajas Clave:
+*   **Ollama**: Por hacer que la ejecución de modelos de lenguaje sea increíblemente accesible.
+*   **Open WebUI**: Por proporcionar una interfaz de chat de primer nivel.
+*   **Qdrant**: Por su motor de base de datos vectorial de alto rendimiento.
+*   **Docker**: Por revolucionar la forma en que construimos y desplegamos software.
+*   **FastAPI**: Por un framework web en Python que es rápido y fácil de usar.
+*   **Netdata, Portainer, Filebrowser**: Por sus excelentes herramientas de gestión y monitoreo.
+*   Y a toda la comunidad de **Python**, **Linux** y **Open Source**.
 
--   **Privacidad Absoluta**: Todo el sistema, desde el LLM hasta tus documentos, se ejecuta **dentro de tu propio servidor**. Ningún dato sale a APIs de terceros. Cumplimiento y seguridad garantizados.
--   **Conocimiento Siempre Fresco**: Simplemente añade o actualiza documentos y la base de conocimiento se refresca automáticamente (cada noche o manualmente), sin necesidad de re-entrenar nada.
--   **Ahorro Gigante**: Evitas los costes prohibitivos del entrenamiento. La inversión se centra en un servidor adecuado, no en ciclos de GPU de supercomputadoras.
+## 🔮 Futuro: RGIA MASTER Pro
 
-## Guía de Ingesta: ¿Cómo alimentar a tu IA?
+La versión actual de RGIA MASTER es una base increíblemente sólida y funcional. La visión a futuro es construir sobre ella una **Versión Pro** aún más potente, pensada para despliegues a mayor escala y con capacidades analíticas avanzadas.
 
-La calidad de las respuestas de tu IA depende directamente de la calidad de la información que le proporcionas. Sigue estas mejores prácticas:
+Estas son algunas de las características planificadas para **RGIA MASTER Pro**:
 
--   **Formato de Archivos**: Prefiere archivos de texto plano como **Markdown (`.md`)**. Son ligeros, estructurados y fáciles de procesar. Los archivos PDF y TXT también son soportados.
--   **Estructura Clara**: Utiliza títulos, subtítulos, listas y párrafos cortos. Una buena estructura en tus documentos ayuda al sistema a encontrar fragmentos de información más precisos.
--   **Contenido Limpio**: Evita texto dentro de imágenes, tablas complejas o formattings extraños. Cuanto más limpio y directo sea el texto, mejor.
--   **Un Tema por Documento**: Siempre que sea posible, crea documentos que se centren en un tema específico (ej. "Manual_Producto_X.md", "Politicas_Vacaciones_2024.md"). Esto mejora la relevancia de las búsquedas.
+*   **🚀 Requisitos de Hardware Avanzados**:
+    *   **GPU Acelerada**: Soporte nativo para inferencia en GPU (NVIDIA), lo que aceleraría las respuestas de 10x a 20x.
+    *   **CPU Mínima**: Requeriría un mínimo de 12 núcleos de CPU para manejar cargas de trabajo más intensas.
 
-## Requisitos de Hardware y Estimación de Rendimiento
+*   **🤖 Selección de Modelos LLM**:
+    *   Permitir al usuario elegir durante la instalación entre al menos tres modelos de lenguaje optimizados para diferentes tareas (ej. uno rápido, uno más potente, uno multilingüe).
 
-Esta plataforma está diseñada para ser flexible. A continuación, se presentan algunas configuraciones recomendadas y una estimación de su capacidad.
+*   **📄 Procesamiento OCR Avanzado**:
+    *   Integración de un motor **OCR (Reconocimiento Óptico de Caracteres) multilingüe** para extraer texto de PDFs escaneados, imágenes y documentos complejos, haciendo que la información no estructurada sea accesible para la IA.
 
-| Componente      | Configuración Mínima (CPU)                                  | Configuración Recomendada (GPU)                                |
-|-----------------|-------------------------------------------------------------|----------------------------------------------------------------|
-| **CPU**         | 8+ Núcleos (Ej. Intel Xeon E-2278G, AMD Ryzen 7 3700X)       | 8-16+ Núcleos (para soportar la carga general)                 |
-| **RAM**         | 32 GB DDR4                                                  | 64 GB DDR4 o más                                               |
-| **Almacenamiento**| 500 GB SSD NVMe (para SO, Docker y datos)                   | 1-2 TB SSD NVMe (para una base de conocimiento más grande)     |
-| **GPU**         | N/A                                                         | **NVIDIA Tesla P40 (24 GB VRAM)** o superior                   |
-| **Red**         | 1 Gbps                                                      | 1 Gbps o más                                                   |
+*   **🏢 Capacidades Multi-Tenencia**:
+    *   Aislar las bases de conocimiento y los documentos por departamento o cliente, permitiendo que una sola instancia sirva a múltiples equipos de forma segura.
 
-### Estimación de Usuarios Concurrentes
+*   **🔌 Conectores de Datos**:
+    *   Añadir conectores para sincronizar conocimiento desde fuentes externas como bases de datos (PostgreSQL, MySQL), Confluence, Notion, etc.
 
--   **Configuración Mínima (CPU)**: La inferencia del LLM en CPU es lenta. Esta configuración es ideal para **desarrollo, pruebas o un uso muy ligero por 1-3 usuarios simultáneos**. Las respuestas pueden tardar varios segundos en generarse.
--   **Configuración Recomendada (GPU)**: Con una GPU como la NVIDIA P40, la velocidad de inferencia del LLM aumenta drásticamente (10x a 20x más rápido). Esta configuración puede servir cómodamente a un equipo pequeño o mediano, soportando aproximadamente **10-15 usuarios concurrentes** con tiempos de respuesta rápidos (1-3 segundos).
-
----
-
-## Guías Avanzadas
-
-### Personalización de Modelos con Ollama
-
-Puedes crear tus propias variantes de modelos (ej. para darles una personalidad o instrucciones específicas) usando un `Modelfile`.
-
-1.  **Crea un `Modelfile`**: En tu máquina local, crea un archivo llamado `Modelfile` (sin extensión).
-    `Modelfile
-    FROM phi3:3.8b-mini-4k-instruct-q4_K_M
-
-    # Define la personalidad del modelo
-    SYSTEM """
-    Eres un asistente experto en finanzas de la empresa Acme.
-    Siempre respondes de forma profesional, concisa y basas tus respuestas
-    únicamente en el contexto proporcionado. Si no sabes la respuesta, di
-    "No tengo información sobre ese tema".
-    """
-    `
-
-2.  **Crea y Publica el Modelo**:
-    -   Ejecuta `ollama create mi-agente-financiero -f Modelfile` en tu servidor.
-    -   El nuevo modelo `mi-agente-financiero` aparecerá automáticamente en la lista de modelos de Open WebUI, listo para ser utilizado.
-
-### Personalización de Open WebUI (Colores y Logo)
-
-Puedes cambiar la apariencia de Open WebUI montando tus propios archivos de personalización.
-
-1.  **Prepara tus Archivos**:
-    -   **Logo**: Crea tu logo en formato SVG.
-    -   **Estilos**: Crea un archivo CSS con tus cambios. Por ejemplo, `custom.css`.
-
-2.  **Añade los Archivos al Servidor**:
-    -   Copia tu logo a `/opt/rag_lab/open_webui_customizations/logo.svg`.
-    -   Copia tu CSS a `/opt/rag_lab/open_webui_customizations/custom.css`.
-
-3.  **Modifica el `docker-compose.yml`**:
-    -   Añade los siguientes volúmenes a la sección del servicio `open-webui`:
-      `yaml
-      volumes:
-        - ./open_webui_data:/app/backend/data
-        - ./open_webui_customizations/logo.svg:/app/static/logo.svg
-        - ./open_webui_customizations/custom.css:/app/static/css/custom.css
-      `
-    -   Reinicia la plataforma con `sudo systemctl restart rag_lab`.
-
-## Análisis y Mejoras Futuras
-
-La plataforma actual es una base sólida, pero puede ser extendida:
-
--   **Multi-Tenencia**: Aislar las colecciones de Qdrant y los documentos por usuario o departamento.
--   **Integración con Otras Fuentes de Datos**: Añadir conectores para bases de datos, Confluence, etc.
--   **Agentes Proactivos**: Desarrollar agentes que puedan iniciar acciones (ej. enviar un correo) en lugar de solo responder preguntas.
--   **Seguridad Avanzada**: Integrar un sistema de autenticación más robusto como OAuth2/OIDC para el RAG Control Center y las APIs.
+*   **⚡ Agentes Proactivos**:
+    *   Desarrollar la capacidad de que los agentes no solo respondan preguntas, sino que también inicien acciones, como enviar un correo electrónico, crear un ticket en un sistema de soporte o ejecutar scripts.
 EOF
 
 # 3. Orquestación y Smoke Tests
