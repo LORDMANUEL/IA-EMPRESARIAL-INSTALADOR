@@ -3,129 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RGIA MASTER - Plataforma RAG Auto-Instalable</title>
+    <title>RGIA Master - Tu Plataforma RAG Empresarial Privada</title>
     <style>
+        :root {
+            --primary-color: #0d6efd;
+            --secondary-color: #6c757d;
+            --bg-color: #f8f9fa;
+            --text-color: #212529;
+            --card-bg: #ffffff;
+            --border-color: #dee2e6;
+            --header-bg: linear-gradient(135deg, #0d6efd 0%, #0d6efd 50%, #0a58ca 100%);
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f4f4f4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
-            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        .header {
+            background: var(--header-bg);
+            color: white;
+            padding: 4rem 1rem;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 3.5rem;
+            margin: 0;
+            animation: fadeInDown 1s;
+        }
+        .header p {
+            font-size: 1.25rem;
+            animation: fadeInUp 1s;
         }
         .container {
-            max-width: 900px;
-            margin: auto;
-            background: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            max-width: 1140px;
+            margin: -3rem auto 2rem auto;
+            padding: 0 1rem;
+            position: relative;
+            z-index: 2;
         }
-        h1, h2 {
-            color: #0056b3;
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 2rem;
+            margin-bottom: 2rem;
         }
-        .button {
-            display: inline-block;
-            background-color: #007bff;
-            color: #fff;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-            transition: background-color 0.3s;
+        h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
         }
-        .button:hover {
-            background-color: #0056b3;
-        }
-        table {
+        .version-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
         }
-        th, td {
-            padding: 12px;
-            border: 1px solid #ddd;
+        .version-table th, .version-table td {
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+        .version-table th {
+            background-color: var(--bg-color);
+            font-size: 1.1rem;
+        }
+        .version-table .feature {
             text-align: left;
+            font-weight: 600;
         }
-        th {
-            background-color: #f8f9fa;
+        .version-table .check {
+            font-size: 1.5rem;
+            color: #198754;
         }
-        code {
-            background: #e9ecef;
-            padding: 2px 6px;
-            border-radius: 4px;
+        .version-table .cross {
+            font-size: 1.5rem;
+            color: #dc3545;
         }
+        .version-table .roadmap {
+            font-style: italic;
+            color: var(--secondary-color);
+        }
+        .code-block {
+            background-color: #212529;
+            color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+        .cta-button:hover {
+            background-color: #0a58ca;
+            transform: translateY(-2px);
+        }
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
+
+    <header class="header">
+        <h1>🚀 RGIA Master</h1>
+        <p>Tu Plataforma RAG Empresarial Privada. Auto-Instalable. Lista en Minutos.</p>
+    </header>
+
     <div class="container">
-        <h1>🚀 RGIA MASTER</h1>
-        <p>Tu Plataforma RAG (Retrieval-Augmented Generation) Auto-Instalable con un solo script.</p>
-        <p>
-            <a href="https://github.com/tu_usuario/rgia-master" class="button">Ver en GitHub</a>
-        </p>
+        <div class="card">
+            <h2>💡 ¿Por Qué RGIA Master?</h2>
+            <p>En la era de la IA, las empresas necesitan aprovechar sus datos de forma privada y segura. RGIA Master es la solución de un solo clic que despliega una plataforma completa de <strong>Generación Aumentada por Recuperación (RAG)</strong> en tu propia infraestructura, dándote control total y seguridad absoluta.</p>
+        </div>
 
-        <h2>¿Qué es RGIA Master?</h2>
-        <p>
-            RGIA Master te permite desplegar una plataforma RAG completa en una máquina Ubuntu/Debian vacía. Es ideal para desarrolladores, equipos pequeños y cualquiera que busque experimentar con agentes de IA y modelos de lenguaje de gran tamaño (LLMs) sobre sus propios documentos, de forma segura y privada.
-        </p>
+        <div class="card">
+            <h2>🌟 Elige tu Versión</h2>
+            <div style="overflow-x:auto;">
+                <table class="version-table">
+                    <thead>
+                        <tr>
+                            <th>Característica</th>
+                            <th>Base</th>
+                            <th>Pro</th>
+                            <th>Pro Max (¡Nuevo!)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td class="feature">Motor RAG Esencial</td><td class="check">✅</td><td class="check">✅</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">Paneles de Monitoreo</td><td class="check">✅</td><td class="check">✅</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">Soporte Multi-Tenant</td><td class="cross">❌</td><td class="check">✅</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">RGIA Control Center</td><td class="cross">❌</td><td class="check">✅</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">Procesamiento OCR (PDFs)</td><td class="cross">❌</td><td class="check">✅</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">Gestión Gráfica de Backups</td><td class="cross">❌</td><td class="check">✅</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">Asistente de Instalación (Wizard)</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">Gestión de Modelos LLM desde UI</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">Analíticas de Ingesta Avanzadas</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅</td></tr>
+                        <tr><td class="feature">Soporte Multi-Modal</td><td class="cross">❌</td><td class="cross">❌</td><td class="roadmap">Roadmap</td></tr>
+                        <tr><td class="feature">RAG con Grafos de Conocimiento</td><td class="cross">❌</td><td class="cross">❌</td><td class="roadmap">Roadmap</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-        <h2>Tabla Comparativa de Versiones</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Característica</th>
-                    <th>Versión Base</th>
-                    <th>Versión Pro</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Motor RAG Principal</strong></td>
-                    <td>✅</td>
-                    <td>✅</td>
-                </tr>
-                <tr>
-                    <td><strong>Paneles de Monitoreo</strong></td>
-                    <td>✅</td>
-                    <td>✅</td>
-                </tr>
-                <tr>
-                    <td><strong>Soporte Multi-Tenant</strong></td>
-                    <td>❌</td>
-                    <td>✅</td>
-                </tr>
-                <tr>
-                    <td><strong>RGIA Control Center</strong></td>
-                    <td>❌</td>
-                    <td>✅</td>
-                </tr>
-                 <tr>
-                    <td><strong>Procesamiento OCR (PDFs escaneados)</strong></td>
-                    <td>❌</td>
-                    <td>✅</td>
-                </tr>
-                <tr>
-                    <td><strong>Gestión Gráfica de Backups</strong></td>
-                    <td>❌</td>
-                    <td>✅</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="card">
+            <h2>🚀 Instalación Rápida</h2>
+            <p>Empezar es tan fácil como clonar el repositorio y ejecutar un comando. Elige la versión que mejor se adapte a ti.</p>
+            <pre class="code-block"><code># 1. Clona el repositorio
+git clone https://github.com/LORDMANUEL/IA-EMPRESARIAL-INSTALADOR.git
+cd IA-EMPRESARIAL-INSTALADOR
 
-        <h2>Instalación Rápida</h2>
-        <p>La instalación es sencilla. Simplemente clona el repositorio y ejecuta el script de la versión que prefieras con permisos de superusuario:</p>
-        <pre><code># Clona el repositorio
-git clone https://github.com/tu_usuario/rgia-master.git
-cd rgia-master
-
-# Ejecuta el instalador de tu elección
-sudo bash ./install_rag_pro.sh</code></pre>
-
-        <h2>Arquitectura Segura</h2>
-        <p>
-            La seguridad es una prioridad. Solo la interfaz de chat (Open WebUI) se expone públicamente. Todos los demás servicios de gestión y datos (Qdrant, Portainer, Control Center) solo son accesibles desde <code>localhost</code>, protegiendo tu infraestructura.
-        </p>
+# 2. Ejecuta el instalador de tu elección (como root)
+sudo bash ./install_rag_promax.sh</code></pre>
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <a href="https://github.com/LORDMANUEL/IA-EMPRESARIAL-INSTALADOR" class="cta-button">Ver en GitHub</a>
+            </div>
+        </div>
     </div>
+
 </body>
 </html>
