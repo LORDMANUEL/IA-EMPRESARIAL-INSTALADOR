@@ -722,21 +722,59 @@ fi
 log_ok "Consulta de prueba completada."
 
 # -----------------------------------------------------------------------------
-# Seccion 16: Copia de archivos web y README final
+# Seccion 16: Generación de archivos finales (Web Interna y README)
 # -----------------------------------------------------------------------------
-# Esta sección asume que los archivos web y el README.md están en el mismo
-# directorio que el script de instalación.
+log_info "Generando dashboard web interno..."
+cat <<'EOF' > "${RAG_LAB_DIR}/web_internal/index.html"
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGIA Master - WebAdmin AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="h-full">
+    <div class="min-h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 sm:p-6 lg:p-8">
+        <div class="w-full max-w-4xl text-center">
+            <h1 id="main-heading" class="text-4xl sm:text-5xl font-bold text-indigo-400 mb-4">RGIA Master - WebAdmin AI</h1>
+            <p class="text-lg text-gray-400 mb-10">Tu centro de control para la plataforma de IA empresarial.</p>
 
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Open WebUI -->
+                <a href="http://localhost:3000" target="_blank" class="bg-gray-800 hover:bg-indigo-500 hover:shadow-lg hover:shadow-indigo-500/50 rounded-lg p-6 transition-all duration-300 transform hover:-translate-y-1">
+                    <i class="fas fa-comments text-4xl text-indigo-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold mb-2">Chat (Open WebUI)</h2>
+                    <p class="text-gray-400">Interactúa con tus documentos y el LLM. (Acceso público)</p>
+                </a>
+
+                <!-- Filebrowser -->
+                <a href="http://127.0.0.1:8080" target="_blank" class="bg-gray-800 hover:bg-green-500 hover:shadow-lg hover:shadow-green-500/50 rounded-lg p-6 transition-all duration-300 transform hover:-translate-y-1">
+                    <i class="fas fa-folder-open text-4xl text-green-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold mb-2">Gestor de Archivos</h2>
+                    <p class="text-gray-400">Sube y gestiona tus documentos. (Acceso vía túnel SSH)</p>
+                </a>
+
+                <!-- Portainer -->
+                <a href="http://127.0.0.1:9000" target="_blank" class="bg-gray-800 hover:bg-sky-500 hover:shadow-lg hover:shadow-sky-500/50 rounded-lg p-6 transition-all duration-300 transform hover:-translate-y-1">
+                    <i class="fas fa-docker text-4xl text-sky-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold mb-2">Docker (Portainer)</h2>
+                    <p class="text-gray-400">Administra tus contenedores. (Acceso vía túnel SSH)</p>
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+EOF
+log_ok "Dashboard web interno generado en ${RAG_LAB_DIR}/web_internal/index.html"
+
+# Copiar el README.md desde el directorio del script
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
-if [ -f "${SCRIPT_DIR}/web_internal/index.html" ]; then
-    log_info "Copiando la web interna a ${RAG_LAB_DIR}/web_internal/..."
-    cp "${SCRIPT_DIR}/web_internal/index.html" "${RAG_LAB_DIR}/web_internal/index.html"
-    log_ok "Web interna copiada."
-else
-    log_warn "No se encontró 'web_internal/index.html' en el directorio del script. Omitiendo copia."
-fi
-
 if [ -f "${SCRIPT_DIR}/README.md" ]; then
     log_info "Copiando README.md a ${RAG_LAB_DIR}/..."
     cp "${SCRIPT_DIR}/README.md" "${RAG_LAB_DIR}/README.md"

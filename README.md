@@ -41,8 +41,8 @@ La instalación es totalmente automatizada. Simplemente clona este repositorio y
 
 ```bash
 # 1. Clona el repositorio
-git clone https://github.com/TU_USUARIO/TU_REPO.git
-cd TU_REPO
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+cd YOUR_REPOSITORY
 
 # 2. Dale permisos de ejecución al instalador
 chmod +x install_rag_cpu.sh
