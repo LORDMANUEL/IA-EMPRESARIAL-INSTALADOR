@@ -3,66 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RGIA MASTER - Plataforma de IA Corporativa Privada</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>RGIA MASTER - Plataforma RAG Auto-Instalable</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&display=swap');
-        body { font-family: 'Roboto', sans-serif; }
-        .font-mono { font-family: 'Roboto Mono', monospace; }
-        .gradient-bg { background: linear-gradient(90deg, #1e3a8a, #3b82f6); }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #0056b3;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-white">
+<body>
+    <div class="container">
+        <h1>🚀 RGIA MASTER</h1>
+        <p>Tu Plataforma RAG (Retrieval-Augmented Generation) Auto-Instalable con un solo script.</p>
+        <p>
+            <a href="https://github.com/tu_usuario/rgia-master" class="button">Ver en GitHub</a>
+        </p>
 
-    <header class="gradient-bg text-center py-12">
-        <h1 class="text-5xl font-bold">RGIA MASTER</h1>
-        <p class="text-xl mt-2">Tu Plataforma de IA Corporativa Privada en Minutos</p>
-    </header>
+        <h2>¿Qué es RGIA Master?</h2>
+        <p>
+            RGIA Master te permite desplegar una plataforma RAG completa en una máquina Ubuntu/Debian vacía. Es ideal para desarrolladores, equipos pequeños y cualquiera que busque experimentar con agentes de IA y modelos de lenguaje de gran tamaño (LLMs) sobre sus propios documentos, de forma segura y privada.
+        </p>
 
-    <main class="container mx-auto px-6 py-12">
+        <h2>Tabla Comparativa de Versiones</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Característica</th>
+                    <th>Versión Base</th>
+                    <th>Versión Pro</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Motor RAG Principal</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td><strong>Paneles de Monitoreo</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td><strong>Soporte Multi-Tenant</strong></td>
+                    <td>❌</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td><strong>RGIA Control Center</strong></td>
+                    <td>❌</td>
+                    <td>✅</td>
+                </tr>
+                 <tr>
+                    <td><strong>Procesamiento OCR (PDFs escaneados)</strong></td>
+                    <td>❌</td>
+                    <td>✅</td>
+                </tr>
+                <tr>
+                    <td><strong>Gestión Gráfica de Backups</strong></td>
+                    <td>❌</td>
+                    <td>✅</td>
+                </tr>
+            </tbody>
+        </table>
 
-        <section class="text-center">
-            <h2 class="text-3xl font-bold text-blue-400">¿Qué es RGIA MASTER?</h2>
-            <p class="mt-4 max-w-3xl mx-auto text-lg">
-                RGIA MASTER es un instalador único que despliega un ecosistema completo de **Inteligencia Artificial Generativa (RAG)** en tu propio servidor. Transforma tus documentos y datos en un cerebro corporativo con el que puedes conversar, garantizando que tu información sensible nunca salga de tu infraestructura.
-            </p>
-        </section>
+        <h2>Instalación Rápida</h2>
+        <p>La instalación es sencilla. Simplemente clona el repositorio y ejecuta el script de la versión que prefieras con permisos de superusuario:</p>
+        <pre><code># Clona el repositorio
+git clone https://github.com/tu_usuario/rgia-master.git
+cd rgia-master
 
-        <section class="mt-16">
-            <h2 class="text-3xl font-bold text-center text-blue-400">Características Principales</h2>
-            <div class="grid md:grid-cols-3 gap-8 mt-8 text-center">
-                <div class="bg-gray-800 p-6 rounded-lg">
-                    <h3 class="text-2xl font-bold">🚀 Despliegue Ultrarrápido</h3>
-                    <p class="mt-2">De un servidor limpio a una plataforma de IA funcional en menos de 10 minutos con un solo comando.</p>
-                </div>
-                <div class="bg-gray-800 p-6 rounded-lg">
-                    <h3 class="text-2xl font-bold">🛡️ 100% Privado y Seguro</h3>
-                    <p class="mt-2">Todo se ejecuta en tu infraestructura. Tus datos nunca se comparten con servicios de terceros.</p>
-                </div>
-                <div class="bg-gray-800 p-6 rounded-lg">
-                    <h3 class="text-2xl font-bold">⚙️ Gestión Centralizada</h3>
-                    <p class="mt-2">Un panel de control web ("RAG Control Center") te da el mando total sobre tu plataforma de IA.</p>
-                </div>
-            </div>
-        </section>
+# Ejecuta el instalador de tu elección
+sudo bash ./install_rag_pro.sh</code></pre>
 
-        <section class="mt-16">
-            <h2 class="text-3xl font-bold text-center text-blue-400">Instalación Inmediata</h2>
-            <p class="text-center mt-4 text-lg">Ejecuta este comando en un servidor Ubuntu/Debian limpio para empezar:</p>
-            <div class="bg-gray-800 rounded-lg p-4 mt-6 max-w-4xl mx-auto">
-                <pre class="font-mono text-lg overflow-x-auto"><code>sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/tu_usuario/tu_repositorio/main/install_rag_cpu.sh)"</code></pre>
-            </div>
-            <p class="text-center mt-4 text-sm text-gray-400">
-                (Nota: Reemplaza la URL con la ubicación real del script en tu repositorio de GitHub)
-            </p>
-        </section>
-
-    </main>
-
-    <footer class="text-center py-8 mt-12 border-t border-gray-700">
-        <p>Desarrollado por Luis Fajardo Rivera (lmfr)</p>
-        <p class="text-gray-400 text-sm mt-1">Construido con tecnologías Open Source.</p>
-    </footer>
-
+        <h2>Arquitectura Segura</h2>
+        <p>
+            La seguridad es una prioridad. Solo la interfaz de chat (Open WebUI) se expone públicamente. Todos los demás servicios de gestión y datos (Qdrant, Portainer, Control Center) solo son accesibles desde <code>localhost</code>, protegiendo tu infraestructura.
+        </p>
+    </div>
 </body>
 </html>
