@@ -8,16 +8,19 @@
 *   **Visión:** Ser el estándar abierto de referencia para laboratorios de IA empresarial en Latinoamérica.
 
 ---
-### 🌟 Ediciones
+### 🌟 Ediciones Detalladas
 
-| Característica | `Base` | `Pro` | `Pro Max` |
-|---|:---:|:---:|:---:|
-| Motor RAG Esencial | ✅ | ✅ | ✅ |
-| Soporte Multi-Tenant | ❌ | ✅ | ✅ |
-| Control Center RAG | ❌ | ✅ | ✅ |
-| OCR para PDFs | ❌ | ✅ | ✅ |
-| Asistente de Instalación | ✅ | ✅ | ✅ |
-| Gestión de Modelos (UI) | ❌ | ❌ | ✅ |
+| Componente / Capacidad | `Base` | `Pro` | `Pro Max` | Descripción |
+|---|:---:|:---:|:---:|---|
+| **Motor RAG (Ollama+Qdrant)** | ✅ | ✅ | ✅ | Núcleo de IA para indexar y consultar documentos. |
+| **Interfaz de Chat (Open WebUI)** | ✅ | ✅ | ✅ | Interfaz web para conversar con la IA. |
+| **Asistente de Instalación Guiado** | ✅ | ✅ | ✅ | Experiencia de instalación interactiva en la terminal. |
+| **Soporte Multi-Tenant** | ❌ | ✅ | ✅ | Aísla documentos y colecciones por proyecto o equipo. |
+| **Procesamiento OCR para PDFs** | ❌ | ✅ | ✅ | Extrae texto de documentos escaneados o imágenes. |
+| **Control Center (Gestión Web)** | ❌ | ✅ | ✅ | Dashboard para ingesta, logs y diagnósticos. |
+| **Gestión de Modelos desde UI** | ❌ | ❌ | ✅ | Descarga y administra modelos LLM desde el Control Center. |
+| **Herramientas de Admin (Portainer)** | ✅ | ✅ | ✅ | Dashboard para gestionar los contenedores Docker. |
+| **Scripts de Ayuda (backup, diag)** | ✅ | ✅ | ✅ | Utilidades de línea de comandos para mantenimiento. |
 
 ---
 
