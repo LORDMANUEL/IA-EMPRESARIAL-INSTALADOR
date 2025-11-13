@@ -1,191 +1,941 @@
-#!/usr-bin/env bash
+#!/usr/bin/env bash
+#
+# RGIA Master - RAG Pro Installer
+# Mision: Simplificar y democratizar la adopción de IA empresarial en las organizaciones.
+# Vision: Ser el estándar abierto de referencia para laboratorios de IA empresarial en Latinoamérica.
+#
+
+# -----------------------------------------------------------------------------
+# Seccion 1: Configuracion inicial y seguridad del script
+# -----------------------------------------------------------------------------
+# - `set -Eeuo pipefail`: Salir inmediatamente si un comando falla (`e`), si una
+#   variable no está definida (`u`), o si un comando en una tubería falla (`pipefail`).
+#   La opción `E` asegura que las trampas de error se hereden en funciones y subshells.
 set -Eeuo pipefail
 
-#
-# RGIA MASTER - PRO VERSION INSTALLER (v2.7 Final Corrected)
-# ==========================================================
-#
-
-# --- Logging & Utils ---
-LOG_FILE="/var/log/rag_pro_install.log"
+# - Redirección de toda la salida (stdout y stderr) a un archivo de log global.
+#   `tee` se usa para que la salida también se muestre en la terminal.
+LOG_FILE="/var/log/rag_install.log"
 exec > >(tee -a "${LOG_FILE}") 2>&1
-info() { echo -e "\033[0;34m[INFO] ${1}\033[0m"; }
-success() { echo -e "\033[0;32m[SUCCESS] ${1}\033[0m"; }
-error() { echo -e "\033[0;31m[ERROR] ${1}\033[0m" >&2; exit 1; }
 
-# --- Preflight Checks ---
-preflight_checks() {
-    info "--- Preflight Checks ---"
-    if [[ "${EUID}" -ne 0 ]]; then error "Must be root."; fi; success "Root OK."
-    if ! grep -qiE "ubuntu|debian" /etc/os-release; then error "Only Ubuntu/Debian."; fi; success "Distro OK."
-    if ! apt-get update -y >/dev/null; then error "apt-get update failed."; fi; success "APT OK."
+# - Archivo de log específico para errores fatales.
+ERROR_LOG_FILE="/var/log/rag_install_errors.log"
+
+# -----------------------------------------------------------------------------
+# Seccion 2: Funciones de logging y manejo de errores
+# -----------------------------------------------------------------------------
+# Estas funciones proporcionan un sistema de logging consistente y un manejo
+# de errores centralizado, facilitando el diagnóstico y la depuración.
+
+# Códigos de color para los mensajes en la terminal
+RESET="\033[0m"
+BOLD="\033[1m"
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+
+log_info() {
+    echo -e "${BLUE}[INFO] $(date '+%Y-%m-%d %H:%M:%S') - ${1}${RESET}"
 }
 
-# --- Variables ---
-export RAG_LAB_DIR="/opt/rag_lab_pro"
-export CONFIG_DIR="${RAG_LAB_DIR}/config"
-export SCRIPTS_DIR="${RAG_LAB_DIR}/scripts"
-export VENV_DIR="${RAG_LAB_DIR}/venv"
-export DOCS_DIR_BASE="${RAG_LAB_DIR}/documents"
-export CONTROL_CENTER_DIR="${RAG_LAB_DIR}/control_center"
+log_ok() {
+    echo -e "${GREEN}[OK] $(date '+%Y-%m-%d %H:%M:%S') - ${1}${RESET}"
+}
 
-# --- File Generation ---
-generate_files() {
-    info "--- Generating Files ---"
-    mkdir -p "${SCRIPTS_DIR}" "${CONFIG_DIR}" "${CONTROL_CENTER_DIR}/templates" "${DOCS_DIR_BASE}"
+log_warn() {
+    echo -e "${YELLOW}[WARN] $(date '+%Y-%m-%d %H:%M:%S') - ${1}${RESET}"
+}
 
-    cat <<'EOF' >"${CONFIG_DIR}/.env"
-OPENWEBUI_PORT=3000
-CONTROL_CENTER_PORT=8001
-TENANTS=default,dev_team
-LLM_MODEL_CHOICE=phi3
-EMBEDDING_MODEL=intfloat/multilingual-e5-small
-ENABLE_OCR=true
-OCR_LANGUAGES=spa
+log_error() {
+    echo -e "${RED}[ERROR] $(date '+%Y-%m-%d %H:%M:%S') - ${1}${RESET}"
+}
+
+# La función `fail_with` termina el script de forma controlada.
+# Recibe un código de error y un mensaje descriptivo.
+fail_with() {
+    local error_code="$1"
+    local message="$2"
+    log_error "${error_code} - ${message}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - ${error_code} - ${message}" >> "${ERROR_LOG_FILE}"
+    echo -e "\n${BOLD}${RED}Instalación fallida. Código de error: ${error_code}.${RESET}"
+    echo -e "${YELLOW}Por favor, revise los logs en ${LOG_FILE} y la sección 'Errores comunes' en el README.md para solucionar el problema.${RESET}"
+    exit 1
+}
+
+# Trampa de errores: se ejecuta si cualquier comando falla y el script termina.
+trap 'fail_with "E999_UNEXPECTED_ERROR" "El script terminó inesperadamente en la línea ${LINENO}."' ERR
+
+# -----------------------------------------------------------------------------
+# Seccion 3: Verificación inicial del sistema (Preflight)
+# -----------------------------------------------------------------------------
+# Antes de realizar cualquier cambio, se comprueba que el entorno es adecuado.
+
+log_info "Iniciando la instalación de RGIA Master - RAG Pro..."
+
+# 3.1. Comprobar si se ejecuta como root
+if [[ "${EUID}" -ne 0 ]]; then
+    fail_with "E000_NOT_ROOT" "Este script debe ser ejecutado con privilegios de root (sudo)."
+fi
+
+# 3.2. Detección de la distribución (solo Ubuntu/Debian)
+if ! command -v lsb_release &> /dev/null || ! lsb_release -is | grep -qE 'Ubuntu|Debian'; then
+    fail_with "E000_UNSUPPORTED_OS" "Este script está diseñado para Ubuntu o Debian."
+fi
+
+# 3.3. Configurar entorno no interactivo para `apt`
+export DEBIAN_FRONTEND=noninteractive
+
+# -----------------------------------------------------------------------------
+# Seccion 4: Definición de variables globales y de configuración
+# -----------------------------------------------------------------------------
+# Centralizar la configuración facilita la personalización y el mantenimiento.
+
+# Directorio base de la plataforma RAG
+RAG_LAB_DIR="/opt/rag_pro"
+
+# Variables de configuración para el archivo .env
+# Estas se pueden sobreescribir si ya existe un .env y queremos ser idempotentes.
+OPENWEBUI_PORT=${OPENWEBUI_PORT:-3000}
+EXPOSE_OLLAMA=${EXPOSE_OLLAMA:-false}
+RAG_COLLECTION=${RAG_COLLECTION:-corporativo_rag}
+EMBEDDING_MODEL=${EMBEDDING_MODEL:-"intfloat/multilingual-e5-small"}
+OLLAMA_MODEL=${OLLAMA_MODEL:-"phi3:3.8b-mini-4k-instruct-q4_K_M"}
+FILEBROWSER_USER=${FILEBROWSER_USER:-"admin"}
+FILEBROWSER_PASS=${FILEBROWSER_PASS:-"admin"}
+OLLAMA_BIND="127.0.0.1"
+if [[ "${EXPOSE_OLLAMA}" == "true" ]]; then
+    OLLAMA_BIND="0.0.0.0"
+fi
+
+# -----------------------------------------------------------------------------
+# Seccion 5: Instalación de dependencias del sistema
+# -----------------------------------------------------------------------------
+log_info "Actualizando lista de paquetes del sistema..."
+if ! apt-get update -y; then
+    log_warn "Falló el primer intento de 'apt-get update'. Reintentando..."
+    sleep 5
+    if ! apt-get update -y; then
+        fail_with "E000_APT_UPDATE_FAILED" "No se pudo actualizar la lista de paquetes."
+    fi
+fi
+log_ok "Lista de paquetes actualizada."
+
+log_info "Instalando dependencias básicas (curl, git, python, etc.)..."
+apt-get install -y curl ca-certificates htop python3 python3-venv python3-pip git jq
+log_ok "Dependencias básicas instaladas."
+
+log_info "Instalando dependencias para la versión Pro (Tesseract OCR)..."
+apt-get install -y tesseract-ocr
+log_ok "Tesseract OCR instalado."
+
+# -----------------------------------------------------------------------------
+# Seccion 6: Instalación y configuración de Docker y Docker Compose
+# -----------------------------------------------------------------------------
+if ! command -v docker &> /dev/null; then
+    log_info "Docker no está instalado. Instalando Docker Engine..."
+    install -m 0755 -d /etc/apt/keyrings
+    if ! curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc; then
+        fail_with "E001_DOCKER_INSTALL_FAILED" "No se pudo descargar la clave GPG de Docker."
+    fi
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -y
+    if ! apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
+        fail_with "E001_DOCKER_INSTALL_FAILED" "No se pudieron instalar los paquetes de Docker."
+    fi
+    log_ok "Docker Engine instalado correctamente."
+else
+    log_info "Docker ya está instalado. Omitiendo instalación."
+fi
+
+# Asegurarse de que el servicio Docker esté activo y habilitado
+log_info "Iniciando y habilitando el servicio Docker..."
+systemctl start docker
+systemctl enable docker
+log_ok "Servicio Docker iniciado y habilitado."
+
+# -----------------------------------------------------------------------------
+# Seccion 7: Configuración del Firewall (UFW)
+# -----------------------------------------------------------------------------
+if command -v ufw &> /dev/null; then
+    log_info "UFW detectado. Configurando reglas de firewall..."
+    ufw allow ssh
+    ufw allow "${OPENWEBUI_PORT}/tcp"
+    if [[ "${EXPOSE_OLLAMA}" == "true" ]]; then
+        ufw allow 11434/tcp
+    fi
+    # Habilitar UFW de forma no interactiva
+    echo "y" | ufw enable
+    log_ok "Reglas de firewall para Open WebUI y SSH aplicadas."
+else
+    log_warn "UFW no está instalado. Se recomienda configurar un firewall."
+fi
+
+# -----------------------------------------------------------------------------
+# Seccion 8: Instalación y configuración de Ollama
+# -----------------------------------------------------------------------------
+if ! command -v ollama &> /dev/null; then
+    log_info "Ollama no está instalado. Instalando Ollama..."
+    if ! (curl -fsSL https://ollama.ai/install.sh | sh); then
+        fail_with "E002_OLLAMA_INSTALL_FAILED" "El script de instalación de Ollama falló."
+    fi
+    log_ok "Ollama instalado correctamente."
+else
+    log_info "Ollama ya está instalado. Omitiendo instalación."
+fi
+
+log_info "Configurando Ollama para escuchar en ${OLLAMA_BIND}..."
+# Crear un override para el servicio systemd de Ollama
+mkdir -p /etc/systemd/system/ollama.service.d
+cat <<EOF > /etc/systemd/system/ollama.service.d/override.conf
+[Service]
+Environment="OLLAMA_HOST=${OLLAMA_BIND}:11434"
 EOF
 
-    cat <<EOF >"${RAG_LAB_DIR}/docker-compose.yml"
-version: '3.8'
-services:
-  qdrant: { image: qdrant/qdrant:v1.9.2, container_name: rag_pro_qdrant, restart: unless-stopped, ports: ["127.0.0.1:6333:6333"], volumes: ["${RAG_LAB_DIR}/qdrant_storage:/qdrant/storage"], networks: ["rag_net"] }
-  open-webui: { image: ghcr.io/open-webui/open-webui:main, container_name: rag_pro_open_webui, restart: unless-stopped, ports: ["\${OPENWEBUI_PORT-3000}:8080"], volumes: ["${RAG_LAB_DIR}/open_webui_data:/app/backend/data"], environment: ['OLLAMA_BASE_URL=http://host.docker.internal:11434'], extra_hosts: ["host.docker.internal:host-gateway"], networks: ["rag_net"] }
-  control-center: { build: { context: ${CONTROL_CENTER_DIR} }, container_name: rag_pro_control_center, restart: unless-stopped, ports: ["127.0.0.1:\${CONTROL_CENTER_PORT-8001}:8000"], volumes: ["/var/run/docker.sock:/var/run/docker.sock", "${RAG_LAB_DIR}:${RAG_LAB_DIR}"], networks: ["rag_net"] }
-networks: { rag_net: { driver: bridge } }
-EOF
+systemctl daemon-reload
+systemctl restart ollama
+log_ok "Ollama configurado y reiniciado."
 
-    cat <<'EOF' >"${CONTROL_CENTER_DIR}/Dockerfile"
+log_info "Descargando el modelo LLM: ${OLLAMA_MODEL}. Esto puede tardar varios minutos..."
+# Intentar descargar el modelo con reintentos
+ollama pull "${OLLAMA_MODEL}" || \
+(log_warn "Falló la descarga del modelo. Reintentando en 15 segundos..." && sleep 15 && ollama pull "${OLLAMA_MODEL}") || \
+(log_warn "Falló la descarga del modelo por segunda vez. Reintentando en 30 segundos..." && sleep 30 && ollama pull "${OLLAMA_MODEL}") || \
+fail_with "E003_MODEL_PULL_FAILED" "No se pudo descargar el modelo ${OLLAMA_MODEL} después de 3 intentos."
+log_ok "Modelo ${OLLAMA_MODEL} descargado con éxito."
+
+# -----------------------------------------------------------------------------
+# Seccion 9: Creación de la estructura de directorios de la plataforma
+# -----------------------------------------------------------------------------
+log_info "Creando la estructura de directorios en ${RAG_LAB_DIR}..."
+mkdir -p "${RAG_LAB_DIR}/documents"
+mkdir -p "${RAG_LAB_DIR}/qdrant_storage"
+mkdir -p "${RAG_LAB_DIR}/open_webui_data"
+mkdir -p "${RAG_LAB_DIR}/scripts"
+mkdir -p "${RAG_LAB_DIR}/logs"
+mkdir -p "${RAG_LAB_DIR}/config"
+mkdir -p "${RAG_LAB_DIR}/portainer"
+mkdir -p "${RAG_LAB_DIR}/web_internal"
+mkdir -p "${RAG_LAB_DIR}/control_center"
+log_ok "Estructura de directorios creada."
+
+log_info "Generando Dockerfile para el RGIA Control Center..."
+cat <<'EOF' > "${RAG_LAB_DIR}/control_center/Dockerfile"
 FROM python:3.11-slim
+
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
+
+EXPOSE 8000
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 EOF
-    cat <<'EOF' >"${CONTROL_CENTER_DIR}/requirements.txt"
-fastapi
-uvicorn[standard]
-jinja2
-python-dotenv
+log_ok "Dockerfile para el Control Center generado."
+
+log_info "Generando requirements.txt para el RGIA Control Center..."
+cat <<'EOF' > "${RAG_LAB_DIR}/control_center/requirements.txt"
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+python-dotenv==1.0.1
+requests==2.31.0
 EOF
-    cat <<'EOF' >"${CONTROL_CENTER_DIR}/main.py"
-import os, subprocess
-from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+log_ok "requirements.txt para el Control Center generado."
 
-RAG_LAB_DIR = "/opt/rag_lab_pro"
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+log_info "Generando la aplicación FastAPI (main.py) para el RGIA Control Center..."
+cat <<'EOF' > "${RAG_LAB_DIR}/control_center/main.py"
+from fastapi import FastAPI
+from pydantic import BaseModel
+import subprocess
+import os
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    tenants = os.getenv("TENANTS", "default").split(',')
-    return templates.TemplateResponse("index.html", {"request": request, "tenants": tenants})
+app = FastAPI(
+    title="RGIA Master Pro - Control Center API",
+    description="API para gestionar y monitorear la plataforma RAG.",
+    version="1.0.0"
+)
 
-@app.post("/run-ingest")
-async def handle_ingest(tenant: str = Form(...)):
-    script = os.path.join(RAG_LAB_DIR, "scripts/ingestion_script.py")
-    venv_python = os.path.join(RAG_LAB_DIR, "venv/bin/python")
+class ApiResponse(BaseModel):
+    status: str
+    message: str
+
+@app.get("/", response_model=ApiResponse)
+def read_root():
+    """Endpoint raíz que confirma que la API está en funcionamiento."""
+    return {"status": "ok", "message": "Bienvenido al RGIA Control Center API"}
+
+@app.post("/ingest", response_model=ApiResponse)
+def trigger_ingestion():
+    """Dispara el script de ingesta de documentos de forma asíncrona."""
     try:
-        proc = subprocess.run([venv_python, script, "--tenant", tenant], capture_output=True, text=True, check=True, env=os.environ)
-        return JSONResponse({"status": "success", "output": proc.stdout})
-    except subprocess.CalledProcessError as e:
-        return JSONResponse({"status": "error", "output": e.stderr})
+        script_path = "/app/scripts/ingestion_script.py"
+        if not os.path.exists(script_path):
+            return {"status": "error", "message": "Script de ingesta no encontrado."}
+
+        # Ejecutar el script en un subproceso para no bloquear la API
+        subprocess.Popen(["python", script_path])
+
+        return {"status": "ok", "message": "Proceso de ingesta iniciado en segundo plano."}
+    except Exception as e:
+        return {"status": "error", "message": f"Error al iniciar la ingesta: {str(e)}"}
 EOF
-    cat <<'EOF' >"${CONTROL_CENTER_DIR}/templates/index.html"
-<!DOCTYPE html><html lang="es"><head><title>RGIA CC</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body><div class="container mt-4"><h1>RGIA Control Center</h1><div class="card mt-3"><div class="card-body"><h5 class="card-title">Ingesta Manual</h5><form id="ingest-form"><select class="form-select" name="tenant">{% for t in tenants %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select><button type="submit" class="btn btn-primary mt-2">Iniciar</button></form><pre id="out" class="mt-2 bg-dark text-white p-2" style="height:200px;overflow-y:scroll;">...</pre></div></div></div><script>
-document.getElementById('ingest-form').addEventListener('submit',async e=>{e.preventDefault();const o=document.getElementById('out');o.textContent='...';const r=await fetch('/run-ingest',{method:'POST',body:new FormData(e.target)});const j=await r.json();o.textContent=j.status==='success'?j.output:'ERROR:\n'+j.output;});</script></body></html>
+log_ok "Aplicación FastAPI (main.py) generada."
+
+# -----------------------------------------------------------------------------
+# Seccion 10: Generación de archivos de configuración
+# -----------------------------------------------------------------------------
+log_info "Generando archivo de configuración .env..."
+cat <<EOF > "${RAG_LAB_DIR}/config/.env"
+# Archivo de configuración para RGIA Master RAG Pro Lab
+# Este archivo es leído por docker-compose y los scripts de Python.
+
+# Puerto para Open WebUI (accesible desde el exterior)
+OPENWEBUI_PORT=${OPENWEBUI_PORT}
+
+# Exponer la API de Ollama a la red local (true/false)
+EXPOSE_OLLAMA=${EXPOSE_OLLAMA}
+
+# IP en la que Ollama debe escuchar (0.0.0.0 para exponer, 127.0.0.1 para local)
+OLLAMA_BIND=${OLLAMA_BIND}
+
+# Nombre de la colección en la base de datos vectorial Qdrant
+RAG_COLLECTION=${RAG_COLLECTION}
+
+# Directorio donde se almacenan los documentos para ingesta
+RAG_DOCS_DIR=${RAG_LAB_DIR}/documents
+
+# Modelo de embedding a utilizar (compatible con Sentence-Transformers)
+EMBEDDING_MODEL=${EMBEDDING_MODEL}
+
+# Modelo de lenguaje a utilizar con Ollama
+OLLAMA_MODEL=${OLLAMA_MODEL}
+
+# Credenciales para el gestor de archivos Filebrowser
+FILEBROWSER_USER=${FILEBROWSER_USER}
+FILEBROWSER_PASS=${FILEBROWSER_PASS}
 EOF
+log_ok "Archivo .env creado en ${RAG_LAB_DIR}/config/.env."
 
-    cp "src/ingestion.py" "${SCRIPTS_DIR}/ingestion_script.py"
-    cp "src/query.py" "${SCRIPTS_DIR}/query_agent.py"
-    chmod +x "${SCRIPTS_DIR}"/*.py
 
-    cat <<'EOF' >"${CONFIG_DIR}/requirements.txt"
-llama-index
-qdrant-client
-pypdf
-sentence-transformers
-ollama
-python-dotenv
-tqdm
-pytesseract
-pdf2image
-urllib3<2.0
+log_info "Generando archivo docker-compose.yml..."
+cat <<'EOF' > "${RAG_LAB_DIR}/docker-compose.yml"
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag_qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    networks:
+      - rag_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: rag_filebrowser
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./documents:/srv
+    environment:
+      - FB_USERNAME=${FILEBROWSER_USER}
+      - FB_PASSWORD=${FILEBROWSER_PASS}
+    networks:
+      - rag_net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:latest
+    container_name: rag_open_webui
+    restart: unless-stopped
+    ports:
+      - "${OPENWEBUI_PORT}:8080"
+    volumes:
+      - ./open_webui_data:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    networks:
+      - rag_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: rag_portainer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./portainer:/data
+    networks:
+      - rag_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  control-center:
+    build:
+      context: ./control_center
+    container_name: rag_control_center
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./scripts:/app/scripts
+      - ./documents:/app/documents
+    networks:
+      - rag_net
+    depends_on:
+      - qdrant
+      - open-webui
+
+networks:
+  rag_net:
+    driver: bridge
 EOF
-    success "File generation complete."
-}
+log_ok "Archivo docker-compose.yml creado en ${RAG_LAB_DIR}/docker-compose.yml."
 
-# --- Installation ---
-install_dependencies() {
-    info "Installing dependencies..."
-    DEBIAN_FRONTEND=noninteractive apt-get install -y tesseract-ocr poppler-utils ca-certificates curl gnupg python3-venv git
-    success "Dependencies installed."
-}
-install_docker() {
-    if command -v docker &>/dev/null; then info "Docker exists."; return; fi
-    info "Installing Docker..."; install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg|gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-    DEBIAN_FRONTEND=noninteractive apt-get update -y && apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-    systemctl enable --now docker; success "Docker installed."
-}
-install_ollama() {
-    if command -v ollama &>/dev/null; then info "Ollama exists."; else info "Installing Ollama..."; curl -fsSL https://ollama.com/install.sh|sh; fi
-    info "Configuring Ollama..."; mkdir -p /etc/systemd/system/ollama.service.d
-    echo -e "[Service]\nExecStart=\nExecStart=/usr/local/bin/ollama serve\nEnvironment=\"OLLAMA_HOST=127.0.0.1\"">/etc/systemd/system/ollama.service.d/override.conf
-    systemctl daemon-reload && systemctl restart ollama
-    info "Pulling model..."; ollama pull phi3; success "Model pulled."
-}
-setup_python_env() {
-    info "Setting up Python venv..."
-    python3 -m venv "${VENV_DIR}"
-    source "${VENV_DIR}/bin/activate" && pip install -r "${CONFIG_DIR}/requirements.txt" && deactivate
-    success "Python venv configured."
-}
-setup_automation() {
-    info "Setting up systemd service..."
-    cat <<EOF >/etc/systemd/system/rag_lab_pro.service
-[Unit]
-Description=RGIA Pro
-After=docker.service network-online.target ollama.service
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=${RAG_LAB_DIR}
-ExecStart=/usr/bin/docker compose up -d --build
-ExecStop=/usr/bin/docker compose down
-[Install]
-WantedBy=multi-user.target
+# -----------------------------------------------------------------------------
+# Seccion 11: Entorno Python para RAG
+# -----------------------------------------------------------------------------
+log_info "Creando entorno virtual de Python en ${RAG_LAB_DIR}/venv..."
+if [ ! -d "${RAG_LAB_DIR}/venv" ]; then
+    python3 -m venv "${RAG_LAB_DIR}/venv" || fail_with "E004_VENV_CREATION_FAILED" "No se pudo crear el entorno virtual."
+fi
+log_ok "Entorno virtual creado."
+
+log_info "Generando archivo requirements.txt..."
+cat <<'EOF' > "${RAG_LAB_DIR}/config/requirements.txt"
+llama-index==0.10.34
+qdrant-client==1.9.0
+pypdf==4.2.0
+sentence-transformers==2.7.0
+urllib3<2.0.0
+tenacity==8.2.3
+tqdm==4.66.4
+requests==2.31.0
+ollama==0.2.0
+python-dotenv==1.0.1
+# Dependencias para OCR en la versión Pro
+pytesseract==0.3.10
+pdf2image==1.17.0
+Pillow==10.3.0
 EOF
-    systemctl daemon-reload; systemctl enable --now rag_lab_pro.service; success "Systemd service enabled."
-}
-run_smoke_tests() {
-    info "--- Running Smoke Tests ---"
-    info "Waiting 60s for services..."
-    sleep 60
-    local ok=true
-    if ! docker compose -f "${RAG_LAB_DIR}/docker-compose.yml" ps | grep -q "Up"; then error "Test 1 FAILED: Containers not up."; ok=false; else success "Test 1: Containers OK."; fi
-    local port; port=$(grep CONTROL_CENTER_PORT "${CONFIG_DIR}/.env" | cut -d= -f2)
-    if ! curl -fsS "http://127.0.0.1:${port}/" >/dev/null; then error "Test 2 FAILED: CC not responding."; ok=false; else success "Test 2: CC OK."; fi
-    if [[ "$ok" = false ]]; then error "Smoke tests failed."; else success "All smoke tests passed."; fi
-}
+log_ok "Archivo requirements.txt creado."
 
-# --- Main Flow ---
-main() {
-    preflight_checks
-    info "--- Starting RGIA Master (Pro) ---"
-    generate_files
-    source "${CONFIG_DIR}/.env"
-    IFS=',' read -ra ts <<< "$TENANTS"; for t in "${ts[@]}"; do mkdir -p "${DOCS_DIR_BASE}/${t}"; done
-    install_dependencies
-    install_docker
-    install_ollama
-    setup_python_env
-    setup_automation
-    run_smoke_tests
-    success "--- RGIA Master (Pro) Finished ---"
-}
+log_info "Instalando dependencias de Python. Esto puede tardar unos minutos..."
+# shellcheck source=/dev/null
+source "${RAG_LAB_DIR}/venv/bin/activate"
+pip install --upgrade pip
+if ! pip install -r "${RAG_LAB_DIR}/config/requirements.txt"; then
+    fail_with "E005_PIP_INSTALL_FAILED" "No se pudieron instalar las dependencias de Python."
+fi
+deactivate
+log_ok "Dependencias de Python instaladas en el entorno virtual."
 
-main "$@"
+# -----------------------------------------------------------------------------
+# Seccion 12: Generación de scripts Python para RAG
+# -----------------------------------------------------------------------------
+
+log_info "Generando script de ingesta Multi-Modal (OCR): ingestion_script.py..."
+cat <<'EOF' > "${RAG_LAB_DIR}/scripts/ingestion_script.py"
+import os
+import hashlib
+import time
+from pathlib import Path
+from dotenv import load_dotenv
+from tqdm import tqdm
+import qdrant_client
+import pytesseract
+from pdf2image import convert_from_path
+from PIL import Image
+import pypdf
+
+from llama_index.core import Document
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.embeddings import resolve_embed_model
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+
+# --- Configuración y Carga de Entorno ---
+print("Iniciando script de ingesta de documentos para RGIA Master Pro...")
+
+config_dir = Path(__file__).parent.parent / 'config'
+dotenv_path = config_dir / '.env'
+load_dotenv(dotenv_path=dotenv_path)
+
+RAG_DOCS_DIR = os.getenv("RAG_DOCS_DIR", "/opt/rag_pro/documents")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "local:intfloat/multilingual-e5-small")
+RAG_COLLECTION = os.getenv("RAG_COLLECTION", "corporativo_rag")
+QDRANT_HOST = "127.0.0.1"
+QDRANT_PORT = 6333
+
+print(f"Directorio de documentos: {RAG_DOCS_DIR}")
+print(f"Modelo de embedding: {EMBEDDING_MODEL}")
+print(f"Colección Qdrant: {RAG_COLLECTION}")
+
+# --- Funciones de Extracción y OCR ---
+
+def extract_text_from_pdf(file_path):
+    """Extrae texto de un PDF combinando pypdf y OCR con Tesseract."""
+    text = ""
+    try:
+        # 1. Intenta extracción directa con pypdf
+        reader = pypdf.PdfReader(file_path)
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        text += "\n"
+    except Exception as e:
+        print(f"  [WARN] pypdf no pudo procesar {file_path}. Error: {e}")
+
+    # 2. Realiza OCR en cada página para capturar texto de imágenes
+    try:
+        images = convert_from_path(file_path)
+        for i, image in enumerate(images):
+            text += pytesseract.image_to_string(image, lang='eng+spa')
+            text += "\n"
+    except Exception as e:
+        print(f"  [WARN] OCR (pdf2image) falló para {file_path}. Error: {e}")
+
+    return text
+
+def process_documents():
+    """Recorre el directorio de documentos y extrae el texto de cada uno."""
+    documents = []
+    supported_extensions = {".pdf", ".txt", ".md"}
+
+    for root, _, files in os.walk(RAG_DOCS_DIR):
+        for file in files:
+            file_path = Path(root) / file
+            if file_path.suffix.lower() not in supported_extensions:
+                continue
+
+            print(f"Procesando archivo: {file_path.name}")
+            content = ""
+            if file_path.suffix.lower() == ".pdf":
+                content = extract_text_from_pdf(str(file_path))
+            else:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+            if content.strip():
+                doc = Document(
+                    text=content,
+                    metadata={"file_path": str(file_path), "file_name": file_path.name}
+                )
+                documents.append(doc)
+    return documents
+
+# --- Funciones Auxiliares de Idempotencia ---
+
+def get_doc_hash(doc):
+    """Genera un hash único para un documento basado en su contenido."""
+    return hashlib.md5(doc.text.encode()).hexdigest()
+
+def get_processed_files_tracker(collection_name):
+    tracker_dir = Path("/opt/rag_pro/logs")
+    tracker_dir.mkdir(exist_ok=True)
+    return tracker_dir / f"processed_{collection_name}.log"
+
+# --- Script Principal ---
+
+def main():
+    start_time = time.time()
+
+    try:
+        # 1. Conexión a Qdrant
+        client = qdrant_client.QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+        try:
+            client.get_collection(collection_name=RAG_COLLECTION)
+        except Exception:
+            client.create_collection(
+                collection_name=RAG_COLLECTION,
+                vectors_config=qdrant_client.http.models.VectorParams(size=384, distance=qdrant_client.http.models.Distance.COSINE)
+            )
+        vector_store = QdrantVectorStore(client=client, collection_name=RAG_COLLECTION)
+
+        # 2. Cargar y procesar documentos con OCR
+        print("\nCargando y procesando documentos con OCR...")
+        docs = process_documents()
+        if not docs:
+            print("No se encontraron nuevos documentos para procesar. Finalizando.")
+            return
+        print(f"Se procesaron {len(docs)} documentos.")
+
+        # 3. Filtrar documentos ya procesados
+        tracker_file = get_processed_files_tracker(RAG_COLLECTION)
+        processed_hashes = set()
+        if tracker_file.exists():
+            with open(tracker_file, 'r') as f:
+                processed_hashes = set(line.strip() for line in f)
+
+        new_docs = []
+        for doc in docs:
+            doc_hash = get_doc_hash(doc)
+            if doc_hash not in processed_hashes:
+                doc.metadata["document_hash"] = doc_hash
+                new_docs.append(doc)
+
+        if not new_docs:
+            print("\nNo hay documentos nuevos para ingestar.")
+            return
+
+        print(f"Se encontraron {len(new_docs)} documentos nuevos para ingestar.")
+
+        # 4. Preparar modelo de embedding y procesar nodos
+        print("\nCargando modelo de embedding y generando nodos...")
+        embed_model = resolve_embed_model(EMBEDDING_MODEL)
+        node_parser = SentenceSplitter(chunk_size=1024, chunk_overlap=100)
+        nodes = node_parser.get_nodes_from_documents(new_docs, show_progress=True)
+
+        for node in nodes:
+            node.embedding = embed_model.get_text_embedding(node.get_content(metadata_mode="all"))
+
+        # 5. Ingesta en Qdrant y actualización del tracker
+        print(f"\nIngestando {len(nodes)} nuevos chunks en Qdrant...")
+        vector_store.add(nodes)
+
+        with open(tracker_file, 'a') as f:
+            for doc in new_docs:
+                f.write(f"{doc.metadata['document_hash']}\n")
+
+        print("Ingesta completada.")
+
+    except Exception as e:
+        print(f"\n[ERROR] Ocurrió un error durante la ingesta: {e}")
+        exit(1)
+
+    end_time = time.time()
+    print(f"\n--- Script de ingesta finalizado en {end_time - start_time:.2f} segundos ---")
+
+if __name__ == "__main__":
+    main()
+EOF
+log_ok "Script de ingesta Multi-Modal (OCR) generado."
+
+log_info "Generando script de consulta: query_agent.py..."
+cat <<'EOF' > "${RAG_LAB_DIR}/scripts/query_agent.py"
+import os
+import sys
+import textwrap
+from pathlib import Path
+from dotenv import load_dotenv
+import qdrant_client
+from llama_index.core.vector_stores import VectorStoreQuery
+from llama_index.core.embeddings import resolve_embed_model
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+import ollama
+
+# --- Configuración y Carga de Entorno ---
+print("Iniciando agente de consulta RAG...")
+
+# Cargar variables de entorno
+config_dir = Path(__file__).parent.parent / 'config'
+dotenv_path = config_dir / '.env'
+load_dotenv(dotenv_path=dotenv_path)
+
+RAG_COLLECTION = os.getenv("RAG_COLLECTION", "corporativo_rag")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "local:intfloat/multilingual-e5-small")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:3.8b-mini-4k-instruct-q4_K_M")
+OLLAMA_BIND = os.getenv("OLLAMA_BIND", "127.0.0.1")
+OLLAMA_URL = f"http://{OLLAMA_BIND}:11434"
+QDRANT_HOST = "127.0.0.1"
+QDRANT_PORT = 6333
+
+print(f"Usando modelo LLM: {OLLAMA_MODEL} en {OLLAMA_URL}")
+print(f"Usando colección Qdrant: {RAG_COLLECTION}")
+
+# --- Funciones Auxiliares ---
+
+def format_prompt(query, context_str):
+    """Formatea el prompt para el modelo de lenguaje, incluyendo el contexto recuperado."""
+    prompt = f"""
+    Eres un asistente experto que responde preguntas basándose únicamente en el contexto proporcionado.
+    Si la respuesta no se encuentra en el contexto, indica que no tienes suficiente información.
+    No inventes respuestas. Sé conciso y directo.
+
+    Contexto recuperado:
+    --------------------
+    {context_str}
+    --------------------
+
+    Pregunta del usuario:
+    {query}
+
+    Respuesta:
+    """
+    return textwrap.dedent(prompt)
+
+# --- Script Principal ---
+
+def main(query_text):
+    try:
+        # 1. Conexión a Qdrant y al modelo de embedding
+        print("\nConectando a Qdrant y cargando modelo de embedding...")
+        client = qdrant_client.QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+        embed_model = resolve_embed_model(EMBEDDING_MODEL)
+        vector_store = QdrantVectorStore(client=client, collection_name=RAG_COLLECTION)
+        print("Conexión exitosa.")
+
+        # 2. Generar embedding para la consulta del usuario
+        print("Generando embedding para la consulta...")
+        query_embedding = embed_model.get_text_embedding(query_text)
+
+        # 3. Realizar la búsqueda de similitud en Qdrant
+        print("Buscando contexto relevante en la base de datos vectorial...")
+        query_obj = VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=5)
+        retrieval_results = vector_store.query(query_obj)
+
+        if not retrieval_results.nodes:
+            print("\n[ADVERTENCIA] No se encontró contexto relevante para la consulta.")
+            # Aún así, intentaremos responder con el conocimiento general del modelo.
+            context_str = "No se encontró información relevante en los documentos."
+        else:
+            print(f"Se recuperaron {len(retrieval_results.nodes)} fragmentos de contexto.")
+            # Imprimir información sobre los fragmentos recuperados para depuración
+            print("\n--- Contexto Recuperado (para depuración) ---")
+            for i, node in enumerate(retrieval_results.nodes):
+                print(f"  Fragmento {i+1} (Score: {retrieval_results.similarities[i]:.4f}):")
+                print(f"    Fuente: {node.metadata.get('file_name', 'N/A')}")
+                print(f"    Contenido: '{textwrap.shorten(node.get_content(), width=100, placeholder='...')}'")
+            print("------------------------------------------")
+
+            context_str = "\n\n".join([node.get_content() for node in retrieval_results.nodes])
+
+        # 4. Construir el prompt y llamar a Ollama
+        prompt = format_prompt(query_text, context_str)
+        print("\nGenerando respuesta con el modelo LLM...")
+
+        # Conectar al cliente de Ollama
+        ollama_client = ollama.Client(host=OLLAMA_URL)
+
+        response = ollama_client.chat(
+            model=OLLAMA_MODEL,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+
+        # 5. Imprimir la respuesta final
+        print("\n========= Respuesta del Asistente IA =========\n")
+        print(textwrap.fill(response['message']['content'], width=100))
+        print("\n============================================\n")
+
+    except Exception as e:
+        print(f"\n[ERROR] Ocurrió un error durante la consulta: {e}")
+        exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        user_query = " ".join(sys.argv[1:])
+    else:
+        user_query = "¿Qué es RGIA Master?"
+        print(f"No se proporcionó una consulta. Usando consulta de ejemplo: '{user_query}'")
+
+    main(user_query)
+EOF
+log_ok "Script de consulta generado."
+
+
+# -----------------------------------------------------------------------------
+# Seccion 13: Automatización (Cron job)
+# -----------------------------------------------------------------------------
+log_info "Configurando tarea cron para la ingesta diaria de documentos..."
+CRON_JOB_FILE="/etc/cron.d/rag_pro_ingest"
+CRON_JOB_CONTENT="0 3 * * * root ${RAG_LAB_DIR}/venv/bin/python ${RAG_LAB_DIR}/scripts/ingestion_script.py >> /var/log/rag_pro_ingest.log 2>&1"
+
+echo "${CRON_JOB_CONTENT}" > "${CRON_JOB_FILE}"
+chmod 0644 "${CRON_JOB_FILE}"
+log_ok "Tarea cron creada en ${CRON_JOB_FILE}."
+
+# -----------------------------------------------------------------------------
+# Seccion 14: Despliegue de la pila Docker
+# -----------------------------------------------------------------------------
+log_info "Iniciando la pila de servicios con Docker Compose..."
+if ! docker compose -f "${RAG_LAB_DIR}/docker-compose.yml" up -d --wait; then
+    fail_with "E006_DOCKER_COMPOSE_FAILED" "No se pudo iniciar la pila de Docker. Revisa los logs con 'docker compose -f ${RAG_LAB_DIR}/docker-compose.yml logs'."
+fi
+log_ok "Pila de servicios Docker desplegada correctamente."
+
+# -----------------------------------------------------------------------------
+# Seccion 15: Pruebas de humo (Smoke Tests)
+# -----------------------------------------------------------------------------
+log_info "Ejecutando pruebas de humo para verificar la instalación..."
+
+# 15.1. Verificar estado de los contenedores
+log_info "Comprobando estado de los contenedores Docker..."
+docker compose -f "${RAG_LAB_DIR}/docker-compose.yml" ps
+if ! docker compose -f "${RAG_LAB_DIR}/docker-compose.yml" ps | grep -q "running"; then
+    log_warn "Algunos contenedores podrían no estar en estado 'running'."
+fi
+
+# 15.2. Healthcheck de Qdrant
+log_info "Verificando salud de Qdrant..."
+if ! curl -fsS http://127.0.0.1:6333/ready > /dev/null; then
+    fail_with "E007_QDRANT_HEALTHCHECK_FAILED" "El healthcheck de Qdrant falló."
+fi
+log_ok "Qdrant está operativo."
+
+# 15.3. Healthcheck de Open WebUI
+log_info "Verificando salud de Open WebUI..."
+if ! curl -fsS "http://127.0.0.1:${OPENWEBUI_PORT}/health" > /dev/null; then
+     fail_with "E008_OPENWEBUI_HEALTHCHECK_FAILED" "El healthcheck de Open WebUI falló."
+fi
+log_ok "Open WebUI está operativo."
+
+# 15.4. Prueba de ingesta y consulta
+log_info "Ejecutando prueba de ingesta y consulta de extremo a extremo..."
+# Crear un documento de prueba
+log_info "Creando documento de prueba..."
+cat <<EOF > "${RAG_LAB_DIR}/documents/ejemplo.txt"
+Bienvenido a RGIA Master.
+La misión de RGIA Master es simplificar y democratizar la adopción de IA empresarial.
+Esta plataforma es un laboratorio RAG que funciona 100% en CPU.
+EOF
+log_ok "Documento de prueba creado."
+
+# Ejecutar script de ingesta
+log_info "Ejecutando ingesta de prueba..."
+if ! "${RAG_LAB_DIR}/venv/bin/python" "${RAG_LAB_DIR}/scripts/ingestion_script.py"; then
+    fail_with "E009_INGEST_FAILED" "La prueba de ingesta falló."
+fi
+log_ok "Ingesta de prueba completada."
+
+# Ejecutar script de consulta
+log_info "Ejecutando consulta de prueba..."
+QUERY="¿Cuál es la misión de RGIA Master?"
+if ! "${RAG_LAB_DIR}/venv/bin/python" "${RAG_LAB_DIR}/scripts/query_agent.py" "${QUERY}"; then
+    fail_with "E010_QUERY_FAILED" "La prueba de consulta falló."
+fi
+log_ok "Consulta de prueba completada."
+
+# -----------------------------------------------------------------------------
+# Seccion 16: Generación de archivos finales (Web Interna y README)
+# -----------------------------------------------------------------------------
+log_info "Generando dashboard web interno..."
+cat <<'EOF' > "${RAG_LAB_DIR}/web_internal/index.html"
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGIA Master - WebAdmin AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="h-full">
+    <div class="min-h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 sm:p-6 lg:p-8">
+        <div class="w-full max-w-4xl text-center">
+            <h1 id="main-heading" class="text-4xl sm:text-5xl font-bold text-indigo-400 mb-4">RGIA Master - WebAdmin AI</h1>
+            <p class="text-lg text-gray-400 mb-10">Tu centro de control para la plataforma de IA empresarial.</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Open WebUI -->
+                <a href="http://localhost:3000" target="_blank" class="bg-gray-800 hover:bg-indigo-500 hover:shadow-lg hover:shadow-indigo-500/50 rounded-lg p-6 transition-all duration-300 transform hover:-translate-y-1">
+                    <i class="fas fa-comments text-4xl text-indigo-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold mb-2">Chat (Open WebUI)</h2>
+                    <p class="text-gray-400">Interactúa con tus documentos y el LLM. (Acceso público)</p>
+                </a>
+
+                <!-- Filebrowser -->
+                <a href="http://127.0.0.1:8080" target="_blank" class="bg-gray-800 hover:bg-green-500 hover:shadow-lg hover:shadow-green-500/50 rounded-lg p-6 transition-all duration-300 transform hover:-translate-y-1">
+                    <i class="fas fa-folder-open text-4xl text-green-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold mb-2">Gestor de Archivos</h2>
+                    <p class="text-gray-400">Sube y gestiona tus documentos. (Acceso vía túnel SSH)</p>
+                </a>
+
+                <!-- Portainer -->
+                <a href="http://127.0.0.1:9000" target="_blank" class="bg-gray-800 hover:bg-sky-500 hover:shadow-lg hover:shadow-sky-500/50 rounded-lg p-6 transition-all duration-300 transform hover:-translate-y-1">
+                    <i class="fas fa-docker text-4xl text-sky-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold mb-2">Docker (Portainer)</h2>
+                    <p class="text-gray-400">Administra tus contenedores. (Acceso vía túnel SSH)</p>
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+EOF
+log_ok "Dashboard web interno generado en ${RAG_LAB_DIR}/web_internal/index.html"
+
+# Copiar el README.md desde el directorio del script
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+if [ -f "${SCRIPT_DIR}/README.md" ]; then
+    log_info "Copiando README.md a ${RAG_LAB_DIR}/..."
+    cp "${SCRIPT_DIR}/README.md" "${RAG_LAB_DIR}/README.md"
+    log_ok "README.md copiado."
+else
+    log_warn "No se encontró 'README.md' en el directorio del script. Omitiendo copia."
+fi
+
+
+# -----------------------------------------------------------------------------
+# Seccion 17: Resumen final de la instalación
+# -----------------------------------------------------------------------------
+echo -e "\n\n${BOLD}${GREEN}====================================================="
+echo -e "  RGIA Master - RAG Pro Lab Instalado con Éxito"
+echo -e "=====================================================${RESET}\n"
+echo -e "${BOLD}¡Felicidades! Tu laboratorio de IA empresarial está listo.${RESET}\n"
+echo -e "Aquí tienes la información clave para empezar:\n"
+echo -e "${BLUE}--- Endpoints de Acceso ---${RESET}"
+echo -e "  - ${BOLD}Chat con el LLM (Open WebUI):${RESET} http://<IP_DEL_SERVIDOR>:${OPENWEBUI_PORT}"
+echo -e "  - ${BOLD}Gestor de Archivos (Filebrowser):${RESET} http://127.0.0.1:8080 (requiere túnel SSH)"
+echo -e "    - Usuario: ${FILEBROWSER_USER}"
+echo -e "    - Contraseña: ${FILEBROWSER_PASS}"
+echo -e "  - ${BOLD}Gestión de Docker (Portainer):${RESET} http://127.0.0.1:9000 (requiere túnel SSH)"
+echo -e "  - ${BOLD}API de Ollama:${RESET} ${OLLAMA_URL} (accesible desde el servidor o LAN si está expuesta)\n"
+echo -e "${BLUE}--- Comando SSH Recomendado para Túnel ---${RESET}"
+echo -e "  ${BOLD}ssh -L 8080:127.0.0.1:8080 -L 9000:127.0.0.1:9000 usuario@<IP_DEL_SERVIDOR>${RESET}\n"
+echo -e "${BLUE}--- Rutas Importantes en el Servidor ---${RESET}"
+echo -e "  - Directorio principal: ${RAG_LAB_DIR}"
+echo -e "  - Documentos para ingesta: ${RAG_LAB_DIR}/documents"
+echo -e "  - Scripts de RAG (para editar): ${RAG_LAB_DIR}/scripts"
+echo -e "  - Web Interna (Dashboard): ${RAG_LAB_DIR}/web_internal/index.html\n"
+echo -e "${BLUE}--- Logs ---${RESET}"
+echo -e "  - Log de esta instalación: ${LOG_FILE}"
+echo -e "  - Resumen de errores: ${ERROR_LOG_FILE}"
+echo -e "  - Log de ingesta diaria (cron): /var/log/rag_pro_ingest.log\n"
+echo -e "${YELLOW}Próximos pasos recomendados:${RESET}"
+echo -e "  1. Accede a Filebrowser para subir tus propios documentos a la carpeta 'documents'."
+echo -e "  2. La ingesta se realizará automáticamente cada noche, o puedes ejecutarla manualmente con:"
+echo -e "     ${BOLD}sudo ${RAG_LAB_DIR}/venv/bin/python ${RAG_LAB_DIR}/scripts/ingestion_script.py${RESET}"
+echo -e "  3. ¡Empieza a chatear con tus documentos a través de Open WebUI!\n"
+
+exit 0

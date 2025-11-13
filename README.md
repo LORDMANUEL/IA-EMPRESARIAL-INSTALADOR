@@ -35,23 +35,41 @@ En un mundo donde la información es el activo más valioso, las empresas se aho
 
 ---
 
-## Instalación en 3 Pasos
+## Dos Versiones, Dos Soluciones
 
-La instalación es totalmente automatizada. Simplemente clona este repositorio y ejecuta el script como `root`.
+Este repositorio contiene dos versiones de la plataforma RGIA Master. Elige la que mejor se adapte a tus necesidades.
 
+### RGIA Master (Base)
+La solución ideal para empezar. Perfecta para PYMEs y equipos que trabajan principalmente con documentos de texto (PDFs nativos, TXT, MD).
+
+**Instalación:**
 ```bash
 # 1. Clona el repositorio
 git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
 cd YOUR_REPOSITORY
 
-# 2. Dale permisos de ejecución al instalador
+# 2. Dale permisos de ejecución al instalador BASE
 chmod +x install_rag_cpu.sh
 
 # 3. Ejecútalo con privilegios de superusuario
 sudo ./install_rag_cpu.sh
 ```
 
-El script se encargará de todo: instalará Docker, Ollama, Python, configurará los servicios y dejará la plataforma lista para usar.
+### RGIA Master Pro
+La solución empresarial. Incluye todo lo de la versión Base, más **soporte para PDFs escaneados (OCR)** y un **RGIA Control Center** para una gestión centralizada.
+
+**Instalación:**
+```bash
+# 1. Clona el repositorio
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+cd YOUR_REPOSITORY
+
+# 2. Dale permisos de ejecución al instalador PRO
+chmod +x install_rag_pro.sh
+
+# 3. Ejecútalo con privilegios de superusuario
+sudo ./install_rag_pro.sh
+```
 
 ---
 
