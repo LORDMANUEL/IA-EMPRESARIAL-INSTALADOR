@@ -33,19 +33,38 @@ success() { echo -e "${C_GREEN}[SUCCESS] ${1}${C_NC}"; }
 warn() { echo -e "${C_YELLOW}[WARNING] ${1}${C_NC}"; }
 error() { echo -e "${C_RED}[ERROR] ${1}${C_NC}" >&2; exit 1; }
 
-# --- Chequeos Previos ---
-check_root() {
+# --- Chequeos Previos y del Entorno ---
+preflight_checks() {
+    info "--- Realizando Chequeos Previo (Preflight Checks) ---"
+
+    # 1. Permisos de Root
     if [[ "${EUID}" -ne 0 ]]; then
         error "Este script debe ser ejecutado como root o con sudo."
     fi
-    info "Chequeo de permisos de root: OK"
-}
+    success "Check 1/4: Permisos de root... OK"
 
-check_distro() {
+    # 2. Distribución compatible
     if ! grep -qiE "ubuntu|debian" /etc/os-release; then
-        error "Este script está diseñado para Ubuntu o Debian."
+        error "Este script está diseñado solo para Ubuntu o Debian."
     fi
-    info "Distribución compatible: OK"
+    success "Check 2/4: Distribución del sistema... OK"
+
+    # 3. Conectividad a Internet y Repositorios APT
+    info "Check 3/4: Verificando conectividad a internet y repositorios APT..."
+    if ! apt-get update -y > /dev/null; then
+        error "No se pudo actualizar la lista de paquetes con 'apt-get update'. Verifica tu conexión a internet y la configuración de '/etc/apt/sources.list'."
+    fi
+    success "Check 3/4: Conectividad a internet y APT... OK"
+
+    # 4. Sincronización Horaria
+    info "Check 4/4: Verificando estado del servicio de tiempo (NTP)..."
+    if ! systemctl is-active --quiet systemd-timesyncd.service; then
+        warn "El servicio de sincronización de tiempo (systemd-timesyncd) no está activo. Se recomienda activarlo para evitar problemas con logs y certificados: sudo timedatectl set-ntp true"
+    else
+        success "Check 4/4: Sincronización horaria (NTP)... OK"
+    fi
+
+    info "--- Chequeos Previos Completados ---"
 }
 
 # --- Variables y Rutas Principales ---
@@ -190,135 +209,36 @@ EOF
     success "Archivo docker-compose.yml generado."
 }
 
-generate_python_scripts() {
-    info "Generando scripts Python..."
-    mkdir -p "${SCRIPTS_DIR}"
+generate_rag_logic() {
+    info "--- Preparando Lógica de Aplicación RAG ---"
+    mkdir -p "${SCRIPTS_DIR}" "${CONFIG_DIR}"
 
+    # Copiar los scripts de Python desde el repositorio a la carpeta de scripts de la instalación
+    info "Copiando scripts de Python desde 'src/'..."
+    if [ -f "src/ingestion.py" ] && [ -f "src/query.py" ]; then
+        cp "src/ingestion.py" "${SCRIPTS_DIR}/ingestion_script.py"
+        cp "src/query.py" "${SCRIPTS_DIR}/query_agent.py"
+        chmod +x "${SCRIPTS_DIR}/ingestion_script.py"
+        chmod +x "${SCRIPTS_DIR}/query_agent.py"
+        success "Scripts de Python copiados."
+    else
+        error "No se encontraron los scripts de Python en el directorio 'src/'. La instalación no puede continuar."
+    fi
+
+    # Generar el requirements.txt
+    info "Creando requirements.txt para la versión Base..."
     cat <<'EOF' > "${CONFIG_DIR}/requirements.txt"
 llama-index
 qdrant-client
 pypdf
 sentence-transformers
 ollama
-tenacity
-tqdm
-requests
 python-dotenv
+tqdm
 urllib3<2.0
+# Nota: pdf2image y pytesseract no se instalan en la versión Base
 EOF
-
-    cat <<'EOF' > "${SCRIPTS_DIR}/ingestion_script.py"
-import os
-import hashlib
-import logging
-from datetime import datetime
-from pathlib import Path
-
-from llama_index.core import SimpleDirectoryReader, Document
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from qdrant_client import QdrantClient, models
-from tenacity import retry, stop_after_attempt, wait_fixed
-from dotenv import load_dotenv
-from tqdm import tqdm
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-load_dotenv(dotenv_path=Path(__file__).parent.parent / 'config' / '.env')
-
-RAG_LAB_DIR = Path(os.getenv("RAG_LAB_DIR", "/opt/rag_lab_base"))
-DOCS_DIR = RAG_LAB_DIR / "documents"
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
-RAG_COLLECTION = os.getenv("RAG_COLLECTION")
-
-def generate_deterministic_id(content: str) -> str:
-    return hashlib.sha256(content.encode('utf-8')).hexdigest()
-
-@retry(stop=stop_after_attempt(5), wait=wait_fixed(10))
-def get_qdrant_client():
-    client = QdrantClient(host="127.0.0.1", port=6333)
-    client.get_collections()
-    return client
-
-def main():
-    logging.info(f"--- Iniciando ingesta desde {DOCS_DIR} ---")
-    client = get_qdrant_client()
-
-    try:
-        client.get_collection(collection_name=RAG_COLLECTION)
-    except Exception:
-        client.create_collection(
-            collection_name=RAG_COLLECTION,
-            vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
-        )
-
-    documents = SimpleDirectoryReader(input_dir=DOCS_DIR, recursive=True).load_data()
-    if not documents:
-        logging.info("No se encontraron nuevos documentos.")
-        return
-
-    node_parser = SentenceSplitter(chunk_size=512, chunk_overlap=50)
-    nodes = node_parser.get_nodes_from_documents(documents, show_progress=True)
-
-    embed_model = HuggingFaceEmbedding(model_name=EMBEDDING_MODEL)
-    for node in tqdm(nodes, desc="Generando embeddings"):
-        node.embedding = embed_model.get_text_embedding(node.get_content())
-
-    points = [
-        models.PointStruct(
-            id=generate_deterministic_id(node.get_content()),
-            vector=node.embedding,
-            payload={ "text": node.get_content(), "metadata": { "source_path": node.metadata.get("file_path", "N/A") } }
-        )
-        for node in nodes
-    ]
-
-    client.upsert(collection_name=RAG_COLLECTION, points=points, wait=True)
-    logging.info(f"Ingesta completada. {len(documents)} documentos procesados, {len(points)} chunks generados.")
-
-if __name__ == "__main__":
-    main()
-EOF
-
-    cat <<'EOF' > "${SCRIPTS_DIR}/query_agent.py"
-import os
-import argparse
-import ollama
-from qdrant_client import QdrantClient
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from dotenv import load_dotenv
-from pathlib import Path
-
-load_dotenv(dotenv_path=Path(__file__).parent.parent / 'config' / '.env')
-
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
-OLLAMA_BIND = os.getenv("OLLAMA_BIND")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
-RAG_COLLECTION = os.getenv("RAG_COLLECTION")
-
-def main(query: str):
-    client = QdrantClient(host="127.0.0.1", port=6333)
-    embed_model = HuggingFaceEmbedding(model_name=EMBEDDING_MODEL)
-    query_embedding = embed_model.get_query_embedding(query)
-
-    search_result = client.search(collection_name=RAG_COLLECTION, query_vector=query_embedding, limit=5)
-    context = "\n---\n".join([hit.payload["text"] for hit in search_result])
-
-    prompt = f"Contexto: {context}\n\nPregunta: {query}\n\nRespuesta:"
-    ollama_client = ollama.Client(host=f"http://{OLLAMA_BIND}:11434")
-
-    print("\n--- Respuesta del Agente RAG ---")
-    response = ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, stream=True)
-    for chunk in response:
-        print(chunk['response'], end='', flush=True)
-    print("\n------------------------------\n")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Agente de consulta RAG.")
-    parser.add_argument("query", type=str, help="La pregunta a realizar.")
-    args = parser.parse_args()
-    main(args.query)
-EOF
-    success "Scripts Python generados."
+    success "requirements.txt generado."
 }
 
 generate_helper_scripts() {
@@ -444,8 +364,7 @@ run_smoke_tests() {
 
 # --- Flujo de Instalación Principal ---
 main() {
-    check_root
-    check_distro
+    preflight_checks
 
     info "--- Iniciando Instalación de RGIA MASTER (Base) ---"
 
@@ -454,7 +373,7 @@ main() {
 
     generate_env_file
     generate_docker_compose
-    generate_python_scripts
+    generate_rag_logic
     generate_helper_scripts
 
     install_dependencies
