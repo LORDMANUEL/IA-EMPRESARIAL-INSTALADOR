@@ -1,34 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Este script se copia a /opt/rag_lab_<tier>/scripts/
-# Debe leer la configuración desde el .env en ese directorio
+# --- backup.sh ---
+# Crea un backup completo del directorio de la aplicación.
 
-# Salir si no estamos en el directorio de scripts
-if [[ ! -f "../config/.env" ]]; then
-    echo "Error: Este script debe ser ejecutado desde el directorio 'scripts' de su instalación."
+# Se asume que este script se encuentra en RAG_LAB_DIR/scripts
+RAG_LAB_DIR=$(cd "$(dirname "$0")/.." && pwd)
+CONFIG_FILE="${RAG_LAB_DIR}/config/.env"
+
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+    echo "ERROR: No se encontró el archivo de configuración en ${CONFIG_FILE}." >&2
     exit 1
 fi
 
-source ../config/.env
+source "${CONFIG_FILE}"
 
-BACKUP_BASE_DIR="${RAG_LAB_DIR}/backups"
+BACKUP_DIR="${RAG_LAB_DIR}/backups"
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-BACKUP_FILE="${BACKUP_BASE_DIR}/rag_lab_backup_${TIMESTAMP}.tgz"
+BACKUP_FILE="${BACKUP_DIR}/rag_lab_backup_${TIMESTAMP}.tgz"
+SERVICE_NAME="rag_lab_${EDITION,,}"
 
-echo ">>> Creando backup de ${RAG_LAB_DIR}..."
-mkdir -p "${BACKUP_BASE_DIR}"
+echo "INFO: Creando directorio de backups en ${BACKUP_DIR}..."
+mkdir -p "${BACKUP_DIR}"
 
-# Detener servicios para asegurar consistencia
-echo ">>> Deteniendo la pila de servicios..."
-systemctl stop "rag_lab_${EDITION,,}" || echo "El servicio no estaba corriendo, continuando..."
+echo "INFO: Deteniendo el servicio ${SERVICE_NAME} para un backup consistente..."
+systemctl stop "${SERVICE_NAME}" || {
+    echo "WARN: No se pudo detener el servicio (puede que no estuviera corriendo). Continuando..."
+}
 
-# Crear el archivo tar
-tar --exclude="${BACKUP_BASE_DIR}" -czvf "${BACKUP_FILE}" -C "$(dirname "${RAG_LAB_DIR}")" "$(basename "${RAG_LAB_DIR}")"
+echo "INFO: Creando backup en ${BACKUP_FILE}..."
+tar --exclude="${BACKUP_DIR}" \
+    -czvf "${BACKUP_FILE}" \
+    -C "$(dirname "${RAG_LAB_DIR}")" \
+    "$(basename "${RAG_LAB_DIR}")"
 
-# Reiniciar servicios
-echo ">>> Reiniciando la pila de servicios..."
-systemctl start "rag_lab_${EDITION,,}"
+echo "INFO: Reiniciando el servicio ${SERVICE_NAME}..."
+systemctl start "${SERVICE_NAME}"
 
-echo ">>> Backup completado: ${BACKUP_FILE}"
+echo "OK: Backup completado exitosamente."
 ls -lh "${BACKUP_FILE}"

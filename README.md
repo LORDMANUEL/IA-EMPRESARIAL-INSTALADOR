@@ -1,5 +1,5 @@
 <div align="center"><h1>🚀 IA EMPRESARIAL 🚀</h1><p><strong>Tu Plataforma RAG Privada. Auto-Instalable. Lista en Minutos.</strong></p>
-<p><img src="https://img.shields.io/badge/Versión-5.0-blue.svg"><img src="https://img.shields.io/badge/Licencia-MIT-green.svg"><img src="https://img.shields.io/badge/Plataforma-Ubuntu%2FDebian-orange.svg"></p></div>
+<p><img src="https://img.shields.io/badge/Versión-5.1-blue.svg"><img src="https://img.shields.io/badge/Licencia-MIT-green.svg"><img src="https://img.shields.io/badge/Plataforma-Ubuntu%2FDebian-orange.svg"></p></div>
 
 ---
 
@@ -35,19 +35,6 @@ El instalador te guiará a través de un asistente para elegir tu edición y con
 ---
 ### ✅ Calidad Garantizada: Smoke Tests
 Al finalizar, el script ejecuta **pruebas automáticas** para validar cada componente. Esto te da la tranquilidad de que la plataforma no solo se "instaló", sino que está **verificada y lista para trabajar**.
-
----
-### 💰 Ahorro Estratégico de una IA Propia
-Tener una IA propia con esta plataforma significa:
-1.  **Costo Controlado:** Opera sobre hardware estándar. El costo es fijo y predecible.
-2.  **Privacidad Absoluta:** Tus datos nunca salen de tu servidor.
-3.  **Activo Estratégico:** Conviertes tu conocimiento en un activo de IA que controlas.
-
----
-### 🛣️ Roadmap y Futuro
-Nuestra visión es ambiciosa y se centra en:
-1.  **Mejores Pipelines de Datos:** Integrar embeddings de vanguardia, soporte multi-modal (imágenes/audio) y RAG con Grafos de Conocimiento.
-2.  **Centralización y Usabilidad:** Evolucionar el Control Center para que sea el único punto de gestión de toda la plataforma.
 
 ---
 ### ⚙️ Errores Comunes y Soluciones
