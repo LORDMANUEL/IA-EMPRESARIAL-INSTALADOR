@@ -143,14 +143,14 @@ info "--- Iniciando Fase P1: Datos y Servicios Base ---"
 
 # 1. Crear Estructura de Directorios
 info "Creando estructura de directorios en ${RAG_LAB_DIR}..."
-mkdir -p "${RAG_LAB_DIR}/documents"
 mkdir -p "${RAG_LAB_DIR}/qdrant_storage"
 mkdir -p "${RAG_LAB_DIR}/open_webui_data"
 mkdir -p "${RAG_LAB_DIR}/scripts"
 mkdir -p "${RAG_LAB_DIR}/logs"
 mkdir -p "${RAG_LAB_DIR}/config"
 mkdir -p "${RAG_LAB_DIR}/control_center/templates"
-mkdir -p "${RAG_LAB_DIR}/documents/knowledge_base"
+mkdir -p "${RAG_LAB_DIR}/tenants/default/documents"
+mkdir -p "${RAG_LAB_DIR}/tenants/default/knowledge_base"
 mkdir -p "${RAG_LAB_DIR}/scripts/agents"
 mkdir -p "${RAG_LAB_DIR}/open_webui_customizations"
 mkdir -p "${RAG_LAB_DIR}/simple_chat/templates"
@@ -165,7 +165,13 @@ OLLAMA_BIND=127.0.0.1
 RAG_COLLECTION=corporativo_rag
 RAG_DOCS_DIR=/opt/rag_lab/documents
 EMBEDDING_MODEL=intfloat/multilingual-e5-small
-OLLAMA_MODEL=phi3:3.8b-mini-4k-instruct-q4_K_M
+
+# --- Selección de Modelo LLM ---
+# Descomenta solo UNA de las siguientes líneas para elegir el modelo.
+# OLLAMA_MODEL="phi3:3.8b-mini-4k-instruct-q4_K_M"  # Opción equilibrada (por defecto)
+# OLLAMA_MODEL="gemma:2b-instruct-q4_K_M"           # Opción ligera y rápida
+OLLAMA_MODEL="mistral:7b-instruct-q4_K_M"         # Opción más potente
+
 FILEBROWSER_USER=admin
 FILEBROWSER_PASS=admin
 ENABLE_NETDATA=true
@@ -191,6 +197,8 @@ python-dotenv
 docker
 jinja2
 python-multipart
+psycopg2-binary
+pandas
 EOF
 
 # 3. Configurar Entorno Virtual de Python
@@ -212,7 +220,7 @@ info "--- Iniciando Fase P2: Lógica RAG y Automatización ---"
 info "Generando scripts de lógica RAG..."
 cat <<'EOF' > "${RAG_LAB_DIR}/scripts/ingestion_script.py"
 #!/usr/bin/env python
-import os, hashlib, time, logging
+import os, hashlib, time, logging, argparse
 from pathlib import Path
 from llama_index.core import SimpleDirectoryReader
 from llama_index.core.text_splitter import SentenceSplitter
@@ -224,10 +232,9 @@ import tenacity
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.FileHandler("/opt/rag_lab/logs/ingestion.log"), logging.StreamHandler()])
 log = logging.getLogger(__name__)
 
-RAG_DOCS_DIR = os.getenv("RAG_DOCS_DIR", "/opt/rag_lab/documents")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-small")
 QDRANT_HOST = "127.0.0.1"
-RAG_COLLECTION = os.getenv("RAG_COLLECTION", "corporativo_rag")
+TENANTS_DIR = "/opt/rag_lab/tenants"
 
 def get_deterministic_id(file_path: str, chunk_content: str) -> str:
     return hashlib.sha256(f"{file_path}{chunk_content}".encode()).hexdigest()
@@ -239,45 +246,69 @@ def wait_for_qdrant():
     client.get_collections()
     return client
 
-def main():
-    log.info("Iniciando ingesta...")
+def main(tenant: str):
+    log.info(f"Iniciando ingesta para el inquilino: {tenant}...")
+
+    rag_collection = f"rag_{tenant}"
+    docs_path = Path(TENANTS_DIR) / tenant / "documents"
+
+    if not docs_path.exists() or not docs_path.is_dir():
+        log.error(f"El directorio de documentos para el inquilino '{tenant}' no existe: {docs_path}")
+        return
+
     qdrant_client = wait_for_qdrant()
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
     vector_size = embedding_model.get_sentence_embedding_dimension()
 
     try:
-        qdrant_client.get_collection(collection_name=RAG_COLLECTION)
+        qdrant_client.get_collection(collection_name=rag_collection)
+        log.info(f"La colección '{rag_collection}' ya existe.")
     except Exception:
-        qdrant_client.recreate_collection(collection_name=RAG_COLLECTION, vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE))
+        log.info(f"Creando nueva colección: '{rag_collection}'")
+        qdrant_client.recreate_collection(
+            collection_name=rag_collection,
+            vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE)
+        )
 
-    docs_path = Path(RAG_DOCS_DIR)
     if not any(docs_path.iterdir()):
-        log.info("Directorio de documentos vacío.")
+        log.info(f"Directorio de documentos para '{tenant}' está vacío. No hay nada que ingestar.")
         return
 
     documents = SimpleDirectoryReader(input_dir=str(docs_path), required_exts=[".pdf", ".txt", ".md"], recursive=True).load_data()
     text_splitter = SentenceSplitter(chunk_size=512, chunk_overlap=64)
 
     points_to_upsert = []
-    for doc in tqdm(documents, desc="Procesando documentos"):
+    for doc in tqdm(documents, desc=f"Procesando documentos para {tenant}"):
         nodes = text_splitter.get_nodes_from_documents([doc])
         for node in nodes:
             chunk_content = node.get_content()
             chunk_id = get_deterministic_id(doc.metadata.get('file_path'), chunk_content)
-            points_to_upsert.append(models.PointStruct(id=chunk_id, vector=embedding_model.encode(chunk_content).tolist(), payload={"source_path": doc.metadata.get('file_path'), "text": chunk_content}))
+            points_to_upsert.append(models.PointStruct(
+                id=chunk_id,
+                vector=embedding_model.encode(chunk_content).tolist(),
+                payload={
+                    "source_path": doc.metadata.get('file_path'),
+                    "text": chunk_content,
+                    "tenant": tenant
+                }
+            ))
 
     if points_to_upsert:
-        qdrant_client.upsert(collection_name=RAG_COLLECTION, points=points_to_upsert, wait=True)
-        log.info(f"Upsert de {len(points_to_upsert)} chunks completado.")
-    log.info("Ingesta finalizada.")
+        qdrant_client.upsert(collection_name=rag_collection, points=points_to_upsert, wait=True)
+        log.info(f"Upsert de {len(points_to_upsert)} chunks completado para el inquilino '{tenant}'.")
+
+    log.info(f"Ingesta para el inquilino '{tenant}' finalizada.")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Ingesta de documentos para un inquilino específico.")
+    parser.add_argument("--tenant", type=str, required=True, help="El nombre del inquilino a procesar.")
+    args = parser.parse_args()
+    main(args.tenant)
 EOF
 
 cat <<'EOF' > "${RAG_LAB_DIR}/scripts/query_agent.py"
 #!/usr/bin/env python
-import os, sys
+import os, sys, argparse
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 import ollama
@@ -285,33 +316,93 @@ import ollama
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-small")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:3.8b-mini-4k-instruct-q4_K_M")
 OLLAMA_HOST = f"http://{os.getenv('OLLAMA_BIND', '127.0.0.1')}:11434"
-RAG_COLLECTION = os.getenv("RAG_COLLECTION", "corporativo_rag")
 
 PROMPT_TEMPLATE = "Contexto:\n{context}\n\nPregunta:\n{query}\n\nRespuesta:"
 
-def main():
-    if len(sys.argv) < 2: sys.exit("Uso: python query_agent.py \"<pregunta>\"")
+def main(query: str, tenant: str):
+    rag_collection = f"rag_{tenant}"
 
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
     qdrant_client = QdrantClient(host="127.0.0.1", port=6333)
     ollama_client = ollama.Client(host=OLLAMA_HOST)
 
-    query_vector = embedding_model.encode(sys.argv[1]).tolist()
-    results = qdrant_client.search(collection_name=RAG_COLLECTION, query_vector=query_vector, limit=3)
+    query_vector = embedding_model.encode(query).tolist()
+    results = qdrant_client.search(collection_name=rag_collection, query_vector=query_vector, limit=3)
 
     if not results:
         print("No se encontraron resultados.")
         return
 
     context = "\n---\n".join([r.payload['text'] for r in results])
-    prompt = PROMPT_TEMPLATE.format(context=context, query=sys.argv[1])
+    prompt = PROMPT_TEMPLATE.format(context=context, query=query)
 
     response = ollama_client.chat(model=OLLAMA_MODEL, messages=[{'role': 'user', 'content': prompt}])
     print(response['message']['content'])
-    print("\nFuentes:", list({r.payload['source_path'] for r in results}))
+    print("\nFuentes (del inquilino '{}'):".format(tenant), list({r.payload['source_path'] for r in results}))
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Consulta a un agente RAG para un inquilino específico.")
+    parser.add_argument("--tenant", type=str, default="default", help="El nombre del inquilino a consultar.")
+    parser.add_argument("query", type=str, help="La pregunta a realizar.")
+    args = parser.parse_args()
+    main(args.query, args.tenant)
+EOF
+
+cat <<'EOF' > "${RAG_LAB_DIR}/scripts/ingest_sql.py"
+#!/usr/bin/env python
+import os
+import argparse
+import pandas as pd
+import psycopg2
+from pathlib import Path
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log = logging.getLogger(__name__)
+
+TENANTS_DIR = "/opt/rag_lab/tenants"
+
+def main(tenant, db_uri, query):
+    log.info(f"Iniciando ingesta de SQL para el inquilino '{tenant}'...")
+
+    tenant_docs_path = Path(TENANTS_DIR) / tenant / "documents"
+    if not tenant_docs_path.exists():
+        log.error(f"El directorio del inquilino '{tenant}' no existe.")
+        return
+
+    try:
+        conn = psycopg2.connect(db_uri)
+        log.info("Conexión a la base de datos establecida.")
+
+        df = pd.read_sql_query(query, conn)
+        conn.close()
+        log.info(f"Consulta ejecutada. Se obtuvieron {len(df)} filas.")
+
+        for index, row in df.iterrows():
+            # Convertir cada fila a un documento de texto
+            doc_content = ", ".join([f"{col}: {val}" for col, val in row.items()])
+
+            # Crear un nombre de archivo único para cada fila
+            # Se podría usar un ID de la fila si existe
+            file_name = f"sql_import_{index}.txt"
+            file_path = tenant_docs_path / file_name
+
+            with open(file_path, "w") as f:
+                f.write(doc_content)
+
+        log.info(f"{len(df)} documentos de texto creados en {tenant_docs_path}")
+        log.info("Ejecuta el script de ingesta normal para añadir estos documentos a la base de datos de vectores.")
+
+    except Exception as e:
+        log.error(f"Ha ocurrido un error: {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Ingesta desde una base de datos SQL a documentos de texto.")
+    parser.add_argument("--tenant", type=str, required=True, help="El nombre del inquilino.")
+    parser.add_argument("--db_uri", type=str, required=True, help="URI de la base de datos PostgreSQL (ej. 'postgresql://user:pass@host:port/dbname').")
+    parser.add_argument("--query", type=str, required=True, help="La consulta SQL a ejecutar.")
+    args = parser.parse_args()
+    main(args.tenant, args.db_uri, args.query)
 EOF
 
 # 2. Generar Scripts de Ayuda (Helpers)
@@ -383,7 +474,8 @@ EOF
 # 3. Configurar Automatización
 info "Configurando automatización..."
 cat <<'EOF' > /etc/cron.d/rag_ingest
-0 3 * * * root ${RAG_LAB_DIR}/venv/bin/python ${RAG_LAB_DIR}/scripts/ingestion_script.py >> /var/log/rag_ingest.log 2>&1
+# Ingesta diaria para el inquilino por defecto. Añade más líneas para otros inquilinos.
+0 3 * * * root ${RAG_LAB_DIR}/venv/bin/python ${RAG_LAB_DIR}/scripts/ingestion_script.py --tenant default >> /var/log/rag_ingest.log 2>&1
 EOF
 chmod 0644 /etc/cron.d/rag_ingest
 systemctl restart cron
@@ -447,14 +539,11 @@ templates = Jinja2Templates(directory="/opt/rag_lab/control_center/templates")
 RAG_LAB_DIR = "/opt/rag_lab"
 SCRIPTS_DIR = os.path.join(RAG_LAB_DIR, "scripts")
 ENV_FILE = os.path.join(RAG_LAB_DIR, "config/.env")
-KNOWLEDGE_BASE_DIR = os.path.join(RAG_LAB_DIR, "documents", "knowledge_base")
+TENANTS_DIR = os.path.join(RAG_LAB_DIR, "tenants")
+KNOWLEDGE_BASE_DIR = os.path.join(TENANTS_DIR, "default", "knowledge_base") # Defaulting to 'default' tenant for now
 
 import json
 
-RAG_LAB_DIR = "/opt/rag_lab"
-SCRIPTS_DIR = os.path.join(RAG_LAB_DIR, "scripts")
-ENV_FILE = os.path.join(RAG_LAB_DIR, "config/.env")
-KNOWLEDGE_BASE_DIR = os.path.join(RAG_LAB_DIR, "documents", "knowledge_base")
 QUERIES_FILE = os.path.join(RAG_LAB_DIR, "logs", "recent_queries.json")
 
 # --- Persistencia del Feedback Loop ---
@@ -492,12 +581,14 @@ def read_root(request: Request, user: str = Depends(get_current_user)):
 
     env_config = dotenv_values(ENV_FILE)
     recent_queries = load_queries()
+    tenants = [d for d in os.listdir(TENANTS_DIR) if os.path.isdir(os.path.join(TENANTS_DIR, d))]
 
     return templates.TemplateResponse("index.html", {
         "request": request,
         "containers": container_statuses,
         "env_config": env_config,
-        "recent_queries": recent_queries
+        "recent_queries": recent_queries,
+        "tenants": tenants
     })
 
 @app.post("/simulated-query")
@@ -544,8 +635,14 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:3.8b-mini-4k-instruct-q4_K_M")
 OLLAMA_HOST = f"http://{os.getenv('OLLAMA_BIND', '127.0.0.1')}:11434"
 RAG_COLLECTION = os.getenv("RAG_COLLECTION", "corporativo_rag")
 
+import re
+
 PROMPT_TEMPLATE = \"\"\"
 {system_prompt}
+
+TASK: Analiza la siguiente pregunta del usuario.
+1. Si la pregunta es una solicitud de información, responde basándote en el contexto proporcionado.
+2. Si la pregunta implica una acción como "enviar un correo", genera un comando de acción ejecutable en formato JSON.
 
 Contexto:
 {{context}}
@@ -559,18 +656,29 @@ Respuesta:
 def main():
     if len(sys.argv) < 2: sys.exit(f"Uso: python {os.path.basename(__file__)} \\"<pregunta>\\"")
 
+    query = " ".join(sys.argv[1:])
+
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
     qdrant_client = QdrantClient(host="127.0.0.1", port=6333)
     ollama_client = ollama.Client(host=OLLAMA_HOST)
 
-    query_vector = embedding_model.encode(sys.argv[1]).tolist()
+    query_vector = embedding_model.encode(query).tolist()
     results = qdrant_client.search(collection_name=RAG_COLLECTION, query_vector=query_vector, limit=3)
 
     context = "\\n---\\n".join([r.payload['text'] for r in results]) if results else "No se encontró información relevante."
-    prompt = PROMPT_TEMPLATE.format(context=context, query=sys.argv[1])
+    prompt = PROMPT_TEMPLATE.format(context=context, query=query)
 
     response = ollama_client.chat(model=OLLAMA_MODEL, messages=[{'role': 'user', 'content': prompt}])
-    print(response['message']['content'])
+
+    # Post-procesamiento para detectar y formatear acciones
+    raw_response = response['message']['content']
+
+    if "action" in raw_response and "mailto" in raw_response:
+        print("Acción Detectada:")
+        print(raw_response)
+    else:
+        print("Respuesta del Agente:")
+        print(raw_response)
 
 if __name__ == "__main__":
     main()
@@ -607,6 +715,41 @@ async def create_agent(
 
     return RedirectResponse(url="/agents", status_code=303)
 
+@app.get("/tenants", response_class=HTMLResponse)
+def tenants_page(request: Request, user: str = Depends(get_current_user)):
+    tenants = [d for d in os.listdir(TENANTS_DIR) if os.path.isdir(os.path.join(TENANTS_DIR, d))]
+    return templates.TemplateResponse("tenants.html", {"request": request, "tenants": tenants})
+
+@app.post("/create-tenant")
+async def create_tenant(tenant_name: str = Form(...), user: str = Depends(get_current_user)):
+    tenant_dir = os.path.join(TENANTS_DIR, tenant_name)
+    if not os.path.exists(tenant_dir):
+        os.makedirs(os.path.join(tenant_dir, "documents"))
+        os.makedirs(os.path.join(tenant_dir, "knowledge_base"))
+    return RedirectResponse(url="/tenants", status_code=303)
+
+@app.get("/connectors", response_class=HTMLResponse)
+def connectors_page(request: Request, user: str = Depends(get_current_user)):
+    tenants = [d for d in os.listdir(TENANTS_DIR) if os.path.isdir(os.path.join(TENANTS_DIR, d))]
+    return templates.TemplateResponse("connectors.html", {"request": request, "tenants": tenants})
+
+@app.post("/run-sql-ingest")
+async def run_sql_ingest(
+    tenant: str = Form(...),
+    db_uri: str = Form(...),
+    query: str = Form(...),
+    user: str = Depends(get_current_user)
+):
+    command = [
+        "/opt/rag_lab/venv/bin/python",
+        "/opt/rag_lab/scripts/ingest_sql.py",
+        "--tenant", tenant,
+        "--db_uri", db_uri,
+        "--query", query
+    ]
+    run_script_in_background(command)
+    return RedirectResponse(url="/connectors", status_code=303)
+
 # --- Simplified Task Execution via Subprocess ---
 def run_script_in_background(command):
     # Asynchronously run a script and log its output
@@ -615,8 +758,12 @@ def run_script_in_background(command):
         subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT, cwd=RAG_LAB_DIR)
 
 @app.post("/ingest")
-async def run_ingest(user: str = Depends(get_current_user)):
-    command = ["/opt/rag_lab/venv/bin/python", "/opt/rag_lab/scripts/ingestion_script.py"]
+async def run_ingest(tenant: str = Form(...), user: str = Depends(get_current_user)):
+    command = [
+        "/opt/rag_lab/venv/bin/python",
+        "/opt/rag_lab/scripts/ingestion_script.py",
+        "--tenant", tenant
+    ]
     run_script_in_background(command)
     return RedirectResponse(url="/", status_code=303)
 
@@ -662,6 +809,8 @@ cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/base.html"
             <h1 class="text-3xl font-bold">RAG Control Center</h1>
             <nav>
                 <a href="/" class="text-blue-500 hover:underline">Dashboard</a> |
+                <a href="/tenants" class="text-blue-500 hover:underline">Tenants</a> |
+                <a href="/connectors" class="text-blue-500 hover:underline">Connectors</a> |
                 <a href="/agents" class="text-blue-500 hover:underline">Agent Creator</a>
             </nav>
         </div>
@@ -669,6 +818,69 @@ cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/base.html"
     </div>
 </body>
 </html>
+EOF
+
+cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/connectors.html"
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white p-4 rounded-lg shadow">
+    <h2 class="text-xl font-semibold mb-2">SQL Database Connector (PostgreSQL)</h2>
+    <form action="/run-sql-ingest" method="post" class="flex flex-col space-y-3">
+        <div>
+            <label for="tenant" class="block text-sm font-medium">Target Tenant</label>
+            <select name="tenant" id="tenant" class="w-full p-2 border rounded">
+                {% for t in tenants %}
+                <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="db_uri" class="block text-sm font-medium">Database URI</label>
+            <input type="text" name="db_uri" id="db_uri" placeholder="postgresql://user:pass@host:port/dbname" class="w-full p-2 border rounded">
+        </div>
+        <div>
+            <label for="query" class="block text-sm font-medium">SQL Query</label>
+            <textarea name="query" id="query" rows="4" class="w-full p-2 border rounded" placeholder="SELECT id, title, content FROM articles"></textarea>
+        </div>
+        <button type="submit" class="bg-blue-500 text-white p-2 rounded">Run SQL Ingest</button>
+    </form>
+    <p class="text-sm text-gray-500 mt-2">This will extract each row from the query into a text file in the tenant's `documents` folder. You must then run the normal ingest process to vectorize them.</p>
+</div>
+{% endblock %}
+EOF
+
+cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/tenants.html"
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Creador de Inquilinos -->
+    <div class="bg-white p-4 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-2">Create a New Tenant</h2>
+        <form action="/create-tenant" method="post" class="flex flex-col space-y-3">
+            <div>
+                <label for="tenant_name" class="block text-sm font-medium">Tenant Name</label>
+                <input type="text" name="tenant_name" id="tenant_name" placeholder="Ej: departamento_ventas" class="w-full p-2 border rounded">
+            </div>
+            <button type="submit" class="bg-blue-500 text-white p-2 rounded">Create Tenant</button>
+        </form>
+    </div>
+
+    <!-- Inquilinos Existentes -->
+    <div class="bg-white p-4 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-2">Existing Tenants</h2>
+        <ul>
+            {% for tenant in tenants %}
+            <li class="border-t py-2">
+                <p><strong>{{ tenant }}</strong></p>
+                <p class="text-sm text-gray-500">Documents Path: `/opt/rag_lab/tenants/{{ tenant }}/documents`</p>
+            </li>
+            {% else %}
+            <li>No tenants created yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}
 EOF
 
 cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/agents.html"
@@ -720,8 +932,21 @@ cat <<'EOF' > "${RAG_LAB_DIR}/control_center/templates/index.html"
     <!-- Panel de Control -->
     <div class="bg-white p-4 rounded-lg shadow">
         <h2 class="text-xl font-semibold mb-2">Control Panel</h2>
-        <div class="flex flex-col space-y-2">
-            <form action="/ingest" method="post"><button type="submit" class="w-full bg-blue-500 text-white p-2 rounded">Run Ingest Now</button></form>
+        <div class="flex flex-col space-y-4">
+            <!-- Ingesta por Inquilino -->
+            <form action="/ingest" method="post" class="space-y-2">
+                <label for="tenant-ingest" class="block text-sm font-medium">Run Ingest for Tenant:</label>
+                <div class="flex space-x-2">
+                    <select name="tenant" id="tenant-ingest" class="w-full p-2 border rounded">
+                        {% for t in tenants %}
+                        <option value="{{ t }}">{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="bg-blue-500 text-white p-2 rounded">Run</button>
+                </div>
+            </form>
+            <hr>
+            <!-- Otras Acciones -->
             <form action="/diagnostics" method="post"><button type="submit" class="w-full bg-green-500 text-white p-2 rounded">Run Diagnostics</button></form>
             <form action="/backup" method="post"><button type="submit" class="w-full bg-yellow-500 text-white p-2 rounded">Create Backup</button></form>
         </div>
@@ -1086,7 +1311,10 @@ Estas son algunas de las características planificadas para **RGIA MASTER Pro**:
     *   **CPU Mínima**: Requeriría un mínimo de 12 núcleos de CPU para manejar cargas de trabajo más intensas.
 
 *   **🤖 Selección de Modelos LLM**:
-    *   Permitir al usuario elegir durante la instalación entre al menos tres modelos de lenguaje optimizados para diferentes tareas (ej. uno rápido, uno más potente, uno multilingüe).
+    *   Puedes elegir fácilmente qué modelo LLM utilizar editando el archivo de configuración `/opt/rag_lab/config/.env`. Hemos preconfigurado tres excelentes opciones para CPU:
+        *   `phi3:3.8b-mini-4k-instruct-q4_K_M` (Equilibrado)
+        *   `gemma:2b-instruct-q4_K_M` (Ligero y Rápido)
+        *   `mistral:7b-instruct-q4_K_M` (Más Potente)
 
 *   **📄 Procesamiento OCR Avanzado**:
     *   Integración de un motor **OCR (Reconocimiento Óptico de Caracteres) multilingüe** para extraer texto de PDFs escaneados, imágenes y documentos complejos, haciendo que la información no estructurada sea accesible para la IA.
@@ -1099,6 +1327,20 @@ Estas son algunas de las características planificadas para **RGIA MASTER Pro**:
 
 *   **⚡ Agentes Proactivos**:
     *   Desarrollar la capacidad de que los agentes no solo respondan preguntas, sino que también inicien acciones, como enviar un correo electrónico, crear un ticket en un sistema de soporte o ejecutar scripts.
+
+## 🔐 Seguridad Avanzada en Producción: Reverse Proxy y OAuth2/OIDC
+
+Para un entorno de producción, se recomienda encarecidamente no exponer los servicios directamente a internet. En su lugar, puedes centralizar el acceso y la autenticación utilizando un **reverse proxy**.
+
+**Concepto:**
+1.  **Configura un Reverse Proxy** (como Nginx, Traefik o Caddy) en un servidor de cara al público.
+2.  **Añade Autenticación Centralizada** al proxy utilizando un proveedor de identidad como Authelia, Keycloak, o un servicio de OAuth2/OIDC de terceros (Google, Azure AD, etc.).
+3.  **Configura el Proxy** para que redirija el tráfico a los servicios de RGIA MASTER (Open WebUI, Simple Chat, etc.) solo después de que el usuario se haya autenticado correctamente.
+
+**Ventajas:**
+*   **Single Sign-On (SSO)**: Los usuarios inician sesión una sola vez para acceder a todas las herramientas.
+*   **Seguridad Centralizada**: Gestionas el acceso y los permisos desde un único lugar.
+*   **Protección Adicional**: El proxy puede proporcionar capas adicionales de seguridad, como WAF (Web Application Firewall) y limitación de peticiones.
 EOF
 
 # 3. Orquestación y Smoke Tests
