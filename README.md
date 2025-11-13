@@ -1,5 +1,5 @@
 <div align="center"><h1>🚀 IA EMPRESARIAL 🚀</h1><p><strong>Tu Plataforma RAG Privada. Auto-Instalable. Lista en Minutos.</strong></p>
-<p><img src="https://img.shields.io/badge/Versión-5.1-blue.svg"><img src="https://img.shields.io/badge/Licencia-MIT-green.svg"><img src="https://img.shields.io/badge/Plataforma-Ubuntu%2FDebian-orange.svg"></p></div>
+<p><img src="https://img.shields.io/badge/Versión-6.1-blue.svg"><img src="https://img.shields.io/badge/Licencia-MIT-green.svg"><img src="https://img.shields.io/badge/Plataforma-Ubuntu%2FDebian-orange.svg"></p></div>
 
 ---
 
@@ -42,7 +42,7 @@ Al finalizar, el script ejecuta **pruebas automáticas** para validar cada compo
 | Código | Mensaje | Causa Probable | Solución |
 |---|---|---|---|
 | E001 | DOCKER_INSTALL_FAILED | Red o repositorios APT | Revisa tu conexión y el log `/var/log/ia_empresarial_install.log`. |
-| E002 | OLLAMA_INSTALL_FAILED | Fallo del script de Ollama | Instala Ollama manualmente y re-ejecuta. |
+| E002 | OLLAMA_INSTALL_FAILED | Fallo del script de Ollama | Instala Ollama manually y re-ejecuta. |
 | E003 | MODEL_PULL_FAILED | Red o el modelo no existe | Verifica tu conexión y el nombre del modelo. |
 | E006 | DOCKER_COMPOSE_FAILED | Puertos ocupados | Revisa `docker compose logs` para ver el conflicto en el directorio de instalación. |
 | E007 | QDRANT_HEALTHCHECK_FAILED | Qdrant no pudo iniciarse | Revisa `docker compose logs qdrant` y el espacio en disco. |
