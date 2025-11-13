@@ -42,118 +42,53 @@ RGIA Master ofrece tres niveles para adaptarse perfectamente a tus necesidades, 
 
 ---
 
-### 🎯 ¿Qué Obtendrás al Ejecutar el Script?
-
-Al finalizar la instalación, tendrás un ecosistema de IA 100% funcional y listo para usar:
-
-*   **🧠 Un Cerebro Central (Ollama + Qdrant):** Un motor de IA que corre localmente, combinado con una base de datos vectorial de alto rendimiento para almacenar y buscar en tus documentos.
-*   **💬 Una Interfaz de Chat Inteligente (Open WebUI):** Un portal web elegante y moderno para que tus equipos puedan conversar con la IA y obtener respuestas basadas en la documentación de tu empresa.
-*   **🛠️ Un Centro de Control Total (RGIA Control Center - Versiones Pro y Pro Max):** Un dashboard web para gestionar la ingesta de datos, crear y administrar copias de seguridad, y diagnosticar el estado del sistema con un solo clic.
-*   **📊 Paneles de Monitoreo Completos (Portainer + Netdata):** Control absoluto sobre tus contenedores y métricas en tiempo real de tu servidor (CPU, RAM, disco) para garantizar la salud y el rendimiento de la plataforma.
-*   **🔐 Seguridad por Defecto:** Todos los servicios de gestión son **privados** y accesibles solo desde `localhost`. Solo la interfaz de chat se expone a tu red, protegiendo tu infraestructura.
-
----
-
-### 🏢 Tu IA Empresarial Privada: RAG como Base Fundamental
-
-Muchas empresas creen que necesitan "entrenar su propio modelo". Esto es un error costoso y, en la mayoría de los casos, innecesario.
-
-El **entrenamiento** o el **fine-tuning** enseñan a un modelo *nuevas habilidades* o *estilos*, pero no son eficientes para enseñarle *conocimiento fáctico* que cambia constantemente (como tu base de documental).
-
-Aquí es donde brilla el **RAG**:
-
-1.  **Conocimiento Fresco y Dinámico:** La IA "aprende" de tus documentos en tiempo real. Si actualizas un manual o añades un nuevo informe, la IA lo sabe al instante en la siguiente ingesta. No necesitas re-entrenar nada.
-2.  **Trazabilidad y Confianza:** Las respuestas de la IA están **basadas en fragmentos reales de tus documentos**. Esto elimina las "alucinaciones" y permite a los usuarios verificar la fuente de cada afirmación.
-3.  **Costo-Eficiencia Extrema:** Utilizas modelos pre-entrenados de altísima calidad (como `phi3`, `llama3`) y los especializas en tus datos sin los costos prohibitivos de GPU y tiempo asociados al entrenamiento.
-4.  **Seguridad y Privacidad:** Tus datos se convierten en vectores y se quedan en tu base de datos Qdrant, en tu servidor. Nunca se envían a terceros.
-
-**RGIA Master** te da esta capacidad estratégica desde el primer día, proporcionando una base sólida y escalable para construir tu IA empresarial.
-
----
-
 ### 🚀 Instalación: De Cero a Héroe en un Comando
 
-La instalación es simple. Elige la versión que necesitas y ejecútala como `root`. La lógica de la aplicación Python se encuentra en el directorio `src/` y será copiada por el instalador.
+La instalación es simple. La lógica de la aplicación Python se encuentra en el directorio `src/` y será copiada por el instalador.
 
 ```bash
-# 1. Clona el repositorio desde GitHub
+# 1. Clona el repositorio
 git clone https://github.com/LORDMANUEL/IA-EMPRESARIAL-INSTALADOR.git
 cd IA-EMPRESARIAL-INSTALADOR
 
-# 2. Elige tu versión y ejecuta el instalador
-# Para la versión Base (esencial)
-sudo bash ./install_rag_base.sh
-
-# Para la versión Pro (con Control Center y OCR)
-sudo bash ./install_rag_pro.sh
-
-# Para la versión Pro Max (con Asistente y Gestión Avanzada)
-sudo bash ./install_rag_promax.sh
-```
-
-El script se encargará de todo: instalar dependencias, configurar Docker, descargar los modelos y orquestar los servicios. ¡Toma un café y vuelve para ver tu plataforma de IA lista!
-
----
-
-### 🛠️ Arquitectura y Servicios
-
-El ecosistema está diseñado para ser seguro y fácil de administrar.
-
-```plaintext
-           🌐 Red Pública / LAN 🌐
-                    |
-+------------------------------------------+
-|            SERVIDOR (Ubuntu/Debian)      |
-|                                          |
-|  +------------------+                    |
-|  |   Open WebUI     | <-- 🌍 Acceso Público (Ej: :3000)
-|  |   (Chat UI)      |
-|  +------------------+                    |
-|                                          |
-|  +------------------+                    |
-|  |   Ollama (Host)  | <-- 🔑 Acceso Localhost (o LAN si se expone)
-|  |   (Motor LLM)    |
-|  +------------------+                    |
-|                                          |
-|  ----------- Red Privada Docker ('rag_net') ------------
-|  |                                                    |
-|  | +-----------------+   +------------------------+   |
-|  | | Qdrant          |   | RGIA Control Center    |   |
-|  | | (Vector DB)     |   | (Gestión - Pro+)       |   |
-|  | | 🚪:6333 (local) |   | 🚪:8001 (local)        |   |
-|  | +-----------------+   +------------------------+   |
-|  |                                                    |
-|  | +-----------------+   +------------------------+   |
-|  | | Portainer       |   | Netdata / Filebrowser  |   |
-|  | | (Monitor Docker)|   | (Otros - local)        |   |
-|  | | 🚪:9000 (local) |   | 🚪:19999 / :8081       |   |
-|  | +-----------------+   +------------------------+   |
-|  |                                                    |
-|  ------------------------------------------------------
-|                                          |
-+------------------------------------------+
-```
-
-Para acceder a los paneles de gestión (`Control Center`, `Portainer`, etc.) desde tu máquina, usa un **túnel SSH**:
-```bash
-ssh -L 8001:127.0.0.1:8001 -L 9000:127.0.0.1:9000 -L 19999:127.0.0.1:19999 -L 8081:127.0.0.1:8081 tu_usuario@<IP_DEL_SERVIDOR>
+# 2. Elige tu versión y ejecuta como root
+sudo bash ./install_rag_pro.sh # o base/promax
 ```
 
 ---
+### ✅ Calidad Garantizada: Smoke Tests
 
-### ✅ Smoke Tests y Garantía de Calidad
+Al finalizar, el script ejecuta **pruebas automáticas** para validar cada componente:
+*   `[✔] Servicios Docker:` Todos los contenedores están operativos.
+*   `[✔] Endpoints de APIs:` El Control Center y otros servicios responden.
+*   `[✔] Pipeline de Ingesta:` Se ejecuta una ingesta de prueba de principio a fin.
 
-Al finalizar la instalación, el script ejecuta una serie de **pruebas automáticas (smoke tests)** para verificar que cada componente crítico de la plataforma esté funcionando correctamente. Esto no es una simulación, es una validación real del entorno recién creado.
-
-**¿Qué verificamos?**
-*   `[✔] Docker & Servicios:` Que todos los contenedores (Qdrant, Open WebUI, etc.) se hayan levantado correctamente.
-*   `[✔] Conectividad de la Base de Datos:` Que Qdrant esté en línea y listo para recibir datos.
-*   `[✔] Disponibilidad del Modelo LLM:` Que Ollama haya descargado el modelo y esté listo para procesar consultas.
-*   `[✔] Funcionalidad del Control Center (Pro+):` Que la interfaz web de gestión sea accesible.
-*   `[✔] Flujo de Ingesta End-to-End (Pro+):` Se realiza una ingesta de prueba para asegurar que el pipeline de datos funcione.
-*   `[✔] Asistente Interactivo (Pro Max):` Se verifica que el nuevo asistente de configuración se ejecute.
-
-Este proceso te da la **tranquilidad** de que la plataforma no solo se "instaló", sino que está **operativa y validada**.
+Esto te da la **tranquilidad** de que la plataforma no solo se "instaló", sino que está **verificada y lista para trabajar**.
 
 ---
-*Este proyecto fue desarrollado por Jules, un agente de software avanzado, con el objetivo de democratizar el acceso a la tecnología RAG de forma segura y eficiente.*
+### 💰 El Ahorro Estratégico de una IA Propia
+
+Desarrollar una IA desde cero es un proyecto multimillonario. Usar APIs de terceros para procesar datos sensibles es un riesgo inasumible y una factura mensual impredecible.
+
+**RGIA Master te permite tener lo mejor de ambos mundos:**
+1.  **Costo Controlado:** Opera sobre hardware de CPU estándar. El costo es fijo, predecible y una fracción minuscule de las alternativas.
+2.  **Privacidad Absoluta:** Tus datos se procesan y se quedan en tu servidor. No hay riesgo de fugas o de que tus datos sean usados para entrenar modelos ajenos.
+3.  **Activo Estratégico:** Conviertes tu conocimiento interno en un activo de IA que puedes controlar, mejorar y evolucionar, en lugar de alquilar una solución genérica.
+
+---
+### 🛣️ Roadmap y Futuro del Proyecto
+
+RGIA Master es una plataforma viva. Nuestra visión es ambiciosa y se centra en tres pilares:
+
+1.  **Mejores Pipelines de Datos:**
+    *   **Embeddings de Vanguardia:** Integrar modelos de embeddings más potentes y específicos para diferentes dominios (código, finanzas, ciencia).
+    *   **Soporte Multi-Modal:** Evolucionar el RAG para que pueda "ver" imágenes y "escuchar" audio, extrayendo contexto de PDFs, JPGs y MP3s por igual.
+    *   **RAG con Grafos de Conocimiento:** Ir más allá de la búsqueda semántica, construyendo relaciones entre entidades en tus documentos para responder preguntas complejas que requieran "razonamiento".
+
+2.  **Centralización y Usabilidad:**
+    *   Mejorar continuamente el **RGIA Control Center** para que se convierta en el único punto de gestión para toda la plataforma: desde la ingesta y la gestión de modelos hasta las analíticas de uso y los logs.
+
+3.  **Inteligencia y Automatización:**
+    *   Continuar mejorando la plataforma para que sea más fácil de usar y mantener.
+
+Gracias por ser parte de este viaje.
