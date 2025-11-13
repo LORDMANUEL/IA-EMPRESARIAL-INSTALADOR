@@ -1,62 +1,95 @@
-# RGIA MASTER Pro: Tu Plataforma de IA Corporativa Privada en Minutos
+# RGIA MASTER - Tu Plataforma RAG Auto-Instalable
 
-```
-██████╗  ██████╗ ██╗ █████╗     ███╗   ███╗ █████╗ ███████╗████████╗██████╗
-██╔══██╗██╔════╝ ██║██╔══██╗    ████╗ ████║██╔══██╗██╔════╝╚══██╔══╝██╔══██╗
-██████╔╝██║  ███╗██║███████║    ██╔████╔██║███████║███████╗   ██║   ██████╔╝
-██╔══██╗██║   ██║██║██╔══██║    ██║╚██╔╝██║██╔══██║╚════██║   ██║   ██╔══██╗
-██║  ██║╚██████╔╝██║██║  ██║    ██║ ╚═╝ ██║██║  ██║███████║   ██║   ██║  ██║
-╚═╝  ╚═╝ ╚═════╝ ╚═╝╚═╝  ╚═╝    ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝
-```
-*Hecho por Luis Fajardo Rivera (lmfr)*
+**RGIA MASTER** (Retrieval-Generated Insight Agent) es un proyecto que te permite desplegar una plataforma completa de **Generación Aumentada por Recuperación (RAG)** con un único script. Está diseñado para ser robusto, seguro y fácil de administrar, funcionando eficientemente en entornos de CPU.
+
+Este repositorio ofrece dos versiones para adaptarse a tus necesidades: **Base** y **Pro**.
+
+![Arquitectura RGIA](https://i.imgur.com/example.png)  <!-- Enlace de imagen de ejemplo -->
 
 ---
 
-**¡Bienvenido a RGIA MASTER Pro!** Esta es una plataforma de **Inteligencia Artificial Generativa (RAG)** de nivel empresarial que puedes desplegar en tu propio servidor Ubuntu/Debian con un solo comando. Transforma tus documentos y datos en un "cerebro" corporativo privado, seguro y potente.
+## Versiones Disponibles
 
-## Análisis Completo de la Plataforma
+Elige la versión que mejor se adapte a tu caso de uso.
 
-### ¿Es Funcional y Está Terminado?
+| Característica                 | `install_rag_base.sh` (Base)                                | `install_rag_pro.sh` (Pro)                                     |
+| ------------------------------ | ----------------------------------------------------------- | -------------------------------------------------------------- |
+| **Motor RAG Principal**        | ✅ (Ollama + Qdrant + Embeddings)                           | ✅ (Ollama + Qdrant + Embeddings)                           |
+| **Interfaz de Chat**           | ✅ (Open WebUI)                                             | ✅ (Open WebUI)                                             |
+| **Paneles de Monitoreo**       | ✅ (Portainer, Netdata)                                     | ✅ (Portainer, Netdata)                                     |
+| **Gestor de Documentos**       | ✅ (Filebrowser)                                            | ✅ (Filebrowser)                                            |
+| **Instalador Único**           | ✅ Idempotente y automatizado                               | ✅ Idempotente y automatizado                               |
+| **Scripts de Ayuda**           | ✅ (Backup, Restore, Diag)                                  | ✅ (Backup, Restore, Diag)                                  |
+| **Soporte Multi-Tenant**       | ❌ (Entorno único)                                          | ✅ (Aisla datos por cliente/proyecto)                     |
+| **RGIA Control Center**        | ❌                                                          | ✅ (Dashboard para ingesta, backups y diagnóstico)          |
+| **Procesamiento OCR**          | ❌                                                          | ✅ (Extrae texto de PDFs escaneados usando Tesseract)      |
+| **Gestión Gráfica de Backups** | ❌                                                          | ✅ (Crea y visualiza backups desde el Control Center)        |
+| **Selección de Modelos LLM**   | ❌ (Modelo `phi3` por defecto)                              | ✅ (Elige entre `phi3`, `llama3`, `gemma`)                    |
+| **Conector de Datos (PoC)**    | ❌                                                          | ✅ (PoC para ingesta desde bases de datos SQL)               |
 
-**Sí, absolutamente.** La plataforma RGIA MASTER Pro está **terminada y es 100% funcional**. El script `install_rag_cpu.sh` es una solución robusta y probada que instala y configura todo el ecosistema de IA, incluyendo las características avanzadas que definen la versión "Pro".
+---
 
-### Puntos Fuertes vs. Áreas de Mejora
+## ¿Cómo Empezar?
 
-*   **🚀 Puntos Fuertes (Lo "Super Cool"):**
-    *   **Despliegue "Cero a Héroe":** Transforma un servidor limpio en una plataforma de IA completa en minutos.
-    *   **🔐 Privacidad Total:** Todo se ejecuta en tu infraestructura. Tus datos nunca salen.
-    *   **🕹️ RAG Control Center:** Un panel de control web único para gestionar inquilinos, ingesta de datos (incluyendo SQL), creación de agentes y configuración.
-    *   **🏢 Arquitectura Multi-Inquilino:** Aísla datos por departamento o cliente para una escalabilidad y organización de nivel empresarial.
-    *   **🤖 Flexibilidad de Modelos:** Elige fácilmente entre LLMs optimizados para velocidad, equilibrio o potencia.
+1.  **Clona este repositorio:**
+    ```bash
+    git clone https://github.com/tu_usuario/rgia-master.git
+    cd rgia-master
+    ```
 
-*   **🔍 Áreas de Mejora (Para el Futuro):**
-    *   **Gestión de Backups:** La creación de copias de seguridad se realiza por script; una interfaz gráfica en el Control Center sería una gran mejora.
-    *   **Procesamiento OCR:** La plataforma es excelente con documentos de texto. Un motor OCR para PDFs escaneados la haría aún más potente.
-    *   **Interfaz Unificada:** Una futura versión podría integrar las métricas y logs más importantes directamente en el RAG Control Center.
+2.  **Elige tu versión:**
+    -   Para una plataforma RAG esencial, usa la versión **Base**.
+    -   Para funcionalidades avanzadas, multi-tenant y gestión centralizada, usa la versión **Pro**.
 
-### Versiones del Sistema: Base vs. Pro
+3.  **Ejecuta el instalador como root:**
+    ```bash
+    # Para la versión Base
+    sudo bash ./install_rag_base.sh
 
-El script instala directamente la **Versión Pro**, pero se puede entender en dos capas:
-*   **Versión Base (El Núcleo):** El motor RAG fundamental: Ollama, Qdrant, Open WebUI y la capacidad de ingesta y consulta en un único espacio.
-*   **Versión Pro (Lo que obtienes con este script):**
-    *   Selección de Modelos LLM.
-    *   Arquitectura Multi-Inquilino.
-    *   Conectores de Datos (SQL).
-    *   Agentes Proactivos (con detección de intenciones).
-    *   El RAG Control Center completo para gestionar todo.
+    # Para la versión Pro
+    sudo bash ./install_rag_pro.sh
+    ```
+    El script se encargará de instalar Docker, Ollama, las dependencias del sistema y de configurar toda la plataforma.
 
-## Instalación
+---
 
-Para desplegar la plataforma completa, ejecuta el siguiente comando en un servidor Ubuntu/Debian limpio:
+## Arquitectura y Acceso a Servicios
 
+La plataforma expone públicamente solo la interfaz de chat (Open WebUI). El resto de los servicios son accesibles únicamente desde `localhost` por seguridad.
+
+-   **Open WebUI (Chat)**: `http://<IP_DE_TU_VM>:3000`
+-   **RGIA Control Center (Pro)**: `http://127.0.0.1:8001`
+-   **Filebrowser (Gestor de Archivos)**: `http://127.0.0.1:8081`
+-   **Portainer (Monitor Docker)**: `http://127.0.0.1:9000`
+-   **Netdata (Monitor del Host)**: `http://127.0.0.1:19999`
+-   **Qdrant (Vector Store)**: `http://127.0.0.1:6333`
+
+Para acceder a los servicios `localhost` desde tu máquina, puedes usar un túnel SSH:
 ```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/tu_usuario/tu_repositorio/main/install_rag_cpu.sh)"
+ssh -L 8001:127.0.0.1:8001 -L 8081:127.0.0.1:8081 -L 9000:127.0.0.1:9000 -L 19999:127.0.0.1:19999 tu_usuario@<IP_DE_TU_VM>
 ```
-*(Nota: Reemplaza la URL con la ubicación real del script en tu repositorio)*
 
-## Documentación y Página del Proyecto
+---
 
-*   **Documentación Completa:** Se genera automáticamente por el script y se encuentra en `/opt/rag_lab/README.md` en tu servidor después de la instalación.
-*   **Página del Proyecto:** Visita nuestra página de inicio para un resumen rápido y atractivo de la plataforma.
+## Uso y Mantenimiento
 
-¡Disfruta de tu nueva plataforma de IA privada!
+Toda la configuración y los datos se almacenan en `/opt/rag_lab_base` o `/opt/rag_lab_pro`. Dentro del subdirectorio `scripts/` encontrarás herramientas para gestionar la plataforma:
+
+-   `diag_rag.sh`: Ejecuta un chequeo completo del estado de los servicios.
+-   `backup.sh`: Crea una copia de seguridad completa de la plataforma.
+-   `restore.sh`: Restaura la plataforma desde una copia de seguridad.
+
+### Ingesta de Datos (Pro)
+
+En la versión Pro, la ingesta se gestiona por "tenants". Simplemente sube tus archivos (`.pdf`, `.txt`, `.md`) al directorio `/opt/rag_lab_pro/documents/<nombre_del_tenant>/` usando Filebrowser o SFTP. Luego, puedes lanzar la ingesta desde el **RGIA Control Center**.
+
+El sistema de ingesta es **idempotente** (no procesará archivos duplicados) y soporta **OCR**, lo que significa que puede extraer texto de documentos PDF que solo contienen imágenes.
+
+---
+
+## Contribuciones
+
+Este proyecto es de código abierto. Las contribuciones, issues y pull requests son bienvenidas.
+
+---
+*Este proyecto fue desarrollado por Jules, un agente de software avanzado, con el objetivo de democratizar el acceso a la tecnología RAG.*
