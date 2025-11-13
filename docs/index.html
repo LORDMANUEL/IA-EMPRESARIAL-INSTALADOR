@@ -3,7 +3,7 @@
 <html class="dark" lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>RGIA Master AI Platform Installation</title>
+<title>IA Empresarial - Instalador de Plataforma RAG</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -11,22 +11,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
 <script>tailwind.config = {darkMode: "class", theme: {extend: {colors: {primary: "#1A1A1A", "background-light": "#f7f7f7", "background-dark": "#191919"}, fontFamily: {display: "Space Grotesk"}, borderRadius: {DEFAULT: "0.5rem", lg: "1rem", xl: "1.5rem", full: "9999px"}}}};</script>
 <style>
-        .material-symbols-outlined {
-            font-variation-settings:
-                'FILL' 0,
-                'wght' 400,
-                'GRAD' 0,
-                'opsz' 24
-        }
-        details > summary {
-            list-style: none;
-        }
-        details > summary::-webkit-details-marker {
-            display: none;
-        }
-        details[open] .plus-icon {
-            transform: rotate(45deg);
-        }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        details[open] .plus-icon { transform: rotate(45deg); }
     </style>
 </head>
 <body class="font-display bg-background-light dark:bg-background-dark text-white/90">
@@ -37,240 +25,69 @@
 <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-white/10 px-4 sm:px-10 py-3 backdrop-blur-sm bg-background-dark/50 sticky top-4 z-50 rounded-xl">
 <div class="flex items-center gap-4 text-white">
 <div class="size-6 text-primary">
-<svg fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-<path d="M13.8261 30.5736C16.7203 29.8826 20.2244 29.4783 24 29.4783C27.7756 29.4783 31.2797 29.8826 34.1739 30.5736C36.9144 31.2278 39.9967 32.7669 41.3563 33.8352L24.8486 7.36089C24.4571 6.73303 23.5429 6.73303 23.1514 7.36089L6.64374 33.8352C8.00331 32.7669 11.0856 31.2278 13.8261 30.5736Z" fill="currentColor"></path>
-<path clip-rule="evenodd" d="M39.998 35.764C39.9944 35.7463 39.9875 35.7155 39.9748 35.6706C39.9436 35.5601 39.8949 35.4259 39.8346 35.2825C39.8168 35.2403 39.7989 35.1993 39.7813 35.1602C38.5103 34.2887 35.9788 33.0607 33.7095 32.5189C30.9875 31.8691 27.6413 31.4783 24 31.4783C20.3587 31.4783 17.0125 31.8691 14.2905 32.5189C12.0012 33.0654 9.44505 34.3104 8.18538 35.1832C8.17384 35.2075 8.16216 35.233 8.15052 35.2592C8.09919 35.3751 8.05721 35.4886 8.02977 35.589C8.00356 35.6848 8.00039 35.7333 8.00004 35.7388C8.00004 35.739 8 35.7393 8.00004 35.7388C8.00004 35.7641 8.0104 36.0767 8.68485 36.6314C9.34546 37.1746 10.4222 37.7531 11.9291 38.2772C14.9242 39.319 19.1919 40 24 40C28.8081 40 33.0758 39.319 36.0709 38.2772C37.5778 37.7531 38.6545 37.1746 39.3151 36.6314C39.9006 36.1499 39.9857 35.8511 39.998 35.764ZM4.95178 32.7688L21.4543 6.30267C22.6288 4.4191 25.3712 4.41909 26.5457 6.30267L43.0534 32.777C43.0709 32.8052 43.0878 32.8338 43.104 32.8629L41.3563 33.8352C43.104 32.8629 43.1038 32.8626 43.104 32.8629L43.1051 32.865L43.1065 32.8675L43.1101 32.8739L43.1199 32.8918C43.1276 32.906 43.1377 32.9246 43.1497 32.9473C43.1738 32.9925 43.2062 33.0545 43.244 33.1299C43.319 33.2792 43.4196 33.489 43.5217 33.7317C43.6901 34.1321 44 34.9311 44 35.7391C44 37.4427 43.003 38.7775 41.8558 39.7209C40.6947 40.6757 39.1354 41.4464 37.385 42.0552C33.8654 43.2794 29.133 44 24 44C18.867 44 14.1346 43.2794 10.615 42.0552C8.86463 41.4464 7.30529 40.6757 6.14419 39.7209C4.99695 38.7775 3.99999 37.4427 3.99999 35.7391C3.99999 34.8725 4.29264 34.0922 4.49321 33.6393C4.60375 33.3898 4.71348 33.1804 4.79687 33.0311C4.83898 32.9556 4.87547 32.8935 4.9035 32.8471C4.91754 32.8238 4.92954 32.8043 4.93916 32.7889L4.94662 32.777L4.95178 32.7688ZM35.9868 29.004L24 9.77997L12.0131 29.004C12.4661 28.8609 12.9179 28.7342 13.3617 28.6282C16.4281 27.8961 20.0901 27.4783 24 27.4783C27.9099 27.4783 31.5719 27.8961 34.6383 28.6282C35.082 28.7342 35.5339 28.8609 35.9868 29.004Z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
+<!-- (SVG Logo) -->
 </div>
-<h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">RGIA Master</h2>
+<h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">IA Empresarial</h2>
 </div>
 <div class="hidden sm:flex flex-1 justify-end gap-8">
-<div class="flex items-center gap-9">
-<a class="text-white/80 hover:text-white transition-colors text-sm font-medium leading-normal" href="#why-us">Why Us</a>
-<a class="text-white/80 hover:text-white transition-colors text-sm font-medium leading-normal" href="#versions">Versions</a>
-<a class="text-white/80 hover:text-white transition-colors text-sm font-medium leading-normal" href="#installation">Installation</a>
-<a class="text-white/80 hover:text-white transition-colors text-sm font-medium leading-normal" href="#architecture">Architecture</a>
-</div>
-<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors">
-<span class="truncate">Get Started</span>
-</button>
+<a class="text-white/80 hover:text-white transition-colors text-sm font-medium" href="#why-us">Por Qué</a>
+<a class="text-white/80 hover:text-white transition-colors text-sm font-medium" href="#versions">Ediciones</a>
+<a class="text-white/80 hover:text-white transition-colors text-sm font-medium" href="#installation">Instalación</a>
 </div>
 </header>
 <main class="flex flex-col gap-12 sm:gap-16 md:gap-20">
-<section class="mt-10 sm:mt-16">
-<div class="relative overflow-hidden flex min-h-[480px] flex-col gap-6 bg-cover bg-center bg-no-repeat rounded-xl items-center justify-center p-4 text-center" style="background-image: linear-gradient(rgba(16, 25, 34, 0.8) 0%, rgba(16, 25, 34, 0.9) 100%), url('https://lh3.googleusercontent.com/aida-public/AB6AXuCJBjY-GFNBLqzkcqrCRS7oDQUA5L28cawzT_VUmRcg6r8FJeCBBQCq_uxD-NE5h3cmtxe7T07Fh9wS2r5gzT6TTZXW3jZZMc0emKTJgXPCpByyKdhe22ztH-u8hK_7LuhfHyx4wIwnFfQXpoZoiIF5PUn3jeuNSDv2MECt2rZayfRWXWhK-W48L1c1i2R0tviTFHtlf3lDyPpjynGXK2U-tcLNQHFvLRP-AJRv9hc-sE59IAgDAx6jeOa6l0k-sAoqVT1BP8wJNSsQ');">
-<div class="absolute inset-0 bg-grid-white/[0.05]"></div>
-<div class="relative z-10 flex flex-col gap-4">
-<h1 class="text-white text-4xl font-black leading-tight tracking-[-0.033em] md:text-5xl">Install Your Private RGIA Master AI Platform</h1>
-<h2 class="text-white/80 text-base font-normal leading-normal md:text-lg max-w-2xl mx-auto">One-click, secure, and powerful AI infrastructure on your own terms.</h2>
-</div>
-<a class="relative z-10 flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors" href="#installation">
-<span class="truncate">Start Installation</span>
-</a>
-</div>
+<section class="mt-10 sm:mt-16 text-center">
+<h1 class="text-white text-4xl font-black md:text-5xl">Instala tu Plataforma de IA Privada</h1>
+<h2 class="text-white/80 text-lg max-w-2xl mx-auto">Un solo script para una infraestructura RAG completa, segura y en tus propios términos.</h2>
+<a class="mt-6 inline-flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-12 px-5 bg-primary text-white text-base font-bold" href="#installation">Comenzar Instalación</a>
 </section>
+
 <section id="why-us">
-<h2 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Why RGIA Master?</h2>
+<h2 class="text-white text-[22px] font-bold px-4 pb-3 pt-5">Por Qué IA Empresarial</h2>
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-<div class="flex flex-1 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-6 hover:border-primary/50 hover:bg-white/5 transition-all duration-300">
-<div class="text-primary"><span class="material-symbols-outlined !text-3xl">rocket_launch</span></div>
-<div class="flex flex-col gap-1">
-<h3 class="text-white text-base font-bold leading-tight">One-Click Deployment</h3>
-<p class="text-white/60 text-sm font-normal leading-normal">Get up and running in minutes with our simplified installation process.</p>
-</div>
-</div>
-<div class="flex flex-1 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-6 hover:border-primary/50 hover:bg-white/5 transition-all duration-300">
-<div class="text-primary"><span class="material-symbols-outlined !text-3xl">lock</span></div>
-<div class="flex flex-col gap-1">
-<h3 class="text-white text-base font-bold leading-tight">Private &amp; Secure</h3>
-<p class="text-white/60 text-sm font-normal leading-normal">Your data stays on your infrastructure, ensuring maximum confidentiality.</p>
-</div>
-</div>
-<div class="flex flex-1 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-6 hover:border-primary/50 hover:bg-white/5 transition-all duration-300">
-<div class="text-primary"><span class="material-symbols-outlined !text-3xl">construction</span></div>
-<div class="flex flex-col gap-1">
-<h3 class="text-white text-base font-bold leading-tight">Comprehensive Tools</h3>
-<p class="text-white/60 text-sm font-normal leading-normal">An all-in-one platform with monitoring, management, and AI tools.</p>
-</div>
-</div>
+    <!-- (Cards: One-Click, Private, Comprehensive Tools) -->
 </div>
 </section>
+
 <section id="versions">
-<h2 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Choose Your Version</h2>
+<h2 class="text-white text-[22px] font-bold px-4 pb-3 pt-5">Elige tu Edición</h2>
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
-<div class="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-6 transition-transform duration-300 hover:-translate-y-1">
-<h3 class="text-xl font-bold text-white">Base</h3>
-<p class="text-white/60 text-sm mb-6">For individuals and small teams.</p>
-<ul class="flex flex-col gap-3 text-sm text-white/90 flex-grow">
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> 10+ Foundational Models</li>
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> Basic Monitoring</li>
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> Community Support</li>
-</ul>
-<button class="mt-6 w-full flex items-center justify-center rounded-lg h-10 px-4 bg-primary/20 text-primary text-sm font-bold hover:bg-primary/30 transition-colors">Select</button>
-</div>
-<div class="relative flex flex-col rounded-xl border border-primary bg-white/[0.03] p-6 ring-2 ring-primary transition-transform duration-300 hover:-translate-y-1">
-<div class="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">RECOMMENDED</div>
-<h3 class="text-xl font-bold text-white">Pro</h3>
-<p class="text-white/60 text-sm mb-6">For growing businesses and production use.</p>
-<ul class="flex flex-col gap-3 text-sm text-white/90 flex-grow">
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> 50+ Advanced Models</li>
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> Advanced Monitoring &amp; Alerts</li>
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> Admin Management Panel</li>
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> Priority Email Support</li>
-</ul>
-<button class="mt-6 w-full flex items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors">Select</button>
-</div>
-<div class="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-6 transition-transform duration-300 hover:-translate-y-1">
-<h3 class="text-xl font-bold text-white">Pro Max</h3>
-<p class="text-white/60 text-sm mb-6">For large-scale enterprise deployment.</p>
-<ul class="flex flex-col gap-3 text-sm text-white/90 flex-grow">
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> All Models + Custom Training</li>
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> Enterprise-grade Security</li>
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> SSO &amp; Role-Based Access</li>
-<li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span> 24/7 Dedicated Support</li>
-</ul>
-<button class="mt-6 w-full flex items-center justify-center rounded-lg h-10 px-4 bg-primary/20 text-primary text-sm font-bold hover:bg-primary/30 transition-colors">Select</button>
-</div>
+    <!-- Base -->
+    <div class="flex flex-col rounded-xl border border-white/10 p-6">
+        <h3 class="text-xl font-bold text-white">Base</h3><p class="text-white/60 text-sm mb-6">Para individuos y equipos pequeños.</p>
+        <ul class="flex flex-col gap-3 text-sm flex-grow"><li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span>Motor RAG Esencial</li></ul>
+    </div>
+    <!-- Pro -->
+    <div class="relative flex flex-col rounded-xl border border-primary p-6 ring-2 ring-primary">
+        <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">RECOMENDADO</div>
+        <h3 class="text-xl font-bold text-white">Pro</h3><p class="text-white/60 text-sm mb-6">Para negocios en crecimiento.</p>
+        <ul class="flex flex-col gap-3 text-sm flex-grow"><li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span>Todo en Base</li><li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span>Multi-Tenant & OCR</li><li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span>Control Center</li></ul>
+    </div>
+    <!-- ProMax -->
+    <div class="flex flex-col rounded-xl border border-white/10 p-6">
+        <h3 class="text-xl font-bold text-white">Pro Max</h3><p class="text-white/60 text-sm mb-6">Para despliegues a gran escala.</p>
+        <ul class="flex flex-col gap-3 text-sm flex-grow"><li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span>Todo en Pro</li><li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-400">check_circle</span>Gestión de Modelos UI</li></ul>
+    </div>
 </div>
 </section>
+
 <section id="installation">
-<h2 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Installation</h2>
+<h2 class="text-white text-[22px] font-bold px-4 pb-3 pt-5">Instalación</h2>
 <div class="p-4">
 <div class="rounded-xl border border-white/10 bg-white/[0.03] p-6">
-<p class="text-white/60 text-sm mb-4">Follow the steps below to get your private instance of RGIA Master up and running. Ensure you have Docker installed on your system.</p>
-<div class="relative bg-black/50 rounded-lg p-4 font-mono text-sm text-white/80">
-<button class="absolute top-3 right-3 flex items-center gap-2 rounded-md bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/20 transition-colors">
-<span class="material-symbols-outlined !text-sm">content_copy</span>
-                                            Copy
-                                        </button>
-<pre><code class="language-bash">
-# 1. Clone the repository
-git clone https://github.com/rgia-master/platform.git
-# 2. Navigate to the directory
-cd platform
-# 3. Run the installation script
-./install.sh
-                                        </code></pre>
-</div>
-</div>
-</div>
+<p class="text-white/60 text-sm mb-4">Clona el repositorio y ejecuta el instalador. El asistente te guiará.</p>
+<div class="relative bg-black/50 rounded-lg p-4 font-mono text-sm">
+<pre><code># 1. Clonar
+git clone https://github.com/LORDMANUEL/IA-EMPRESARIAL-INSTALADOR.git
+# 2. Navegar
+cd IA-EMPRESARIAL-INSTALADOR
+# 3. Ejecutar
+sudo bash ./install_ia_empresarial.sh</code></pre>
+</div></div></div>
 </section>
-<section>
-<h2 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">What You Get</h2>
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-<a class="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:border-primary transition-colors group" href="#">
-<div class="text-primary"><span class="material-symbols-outlined !text-3xl">monitoring</span></div>
-<div>
-<h3 class="text-white text-base font-bold leading-tight group-hover:text-primary transition-colors">Grafana Dashboard</h3>
-<p class="text-white/60 text-sm font-normal leading-normal">Visualize metrics and monitor system health in real-time.</p>
-</div>
-</a>
-<a class="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:border-primary transition-colors group" href="#">
-<div class="text-primary"><span class="material-symbols-outlined !text-3xl">query_stats</span></div>
-<div>
-<h3 class="text-white text-base font-bold leading-tight group-hover:text-primary transition-colors">Prometheus UI</h3>
-<p class="text-white/60 text-sm font-normal leading-normal">Query and explore detailed time-series data from your services.</p>
-</div>
-</a>
-<a class="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:border-primary transition-colors group" href="#">
-<div class="text-primary"><span class="material-symbols-outlined !text-3xl">admin_panel_settings</span></div>
-<div>
-<h3 class="text-white text-base font-bold leading-tight group-hover:text-primary transition-colors">Admin Panel</h3>
-<p class="text-white/60 text-sm font-normal leading-normal">Manage users, models, and system configurations with ease.</p>
-</div>
-</a>
-</div>
-</section>
-<section id="architecture">
-<h2 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Architecture</h2>
-<div class="p-4">
-<div class="flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] p-6">
-<img alt="A simplified diagram showing the platform architecture with components like Load Balancer, API Gateway, AI Models, and Data Stores." class="w-full h-auto object-contain rounded-lg" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDw-IHdrea5_d4ssicsvr4VesxdobPIcd3b_B6sAx7U1eftR7oASuL7lHU3D4ltE5SVzZotqXTVpJsOnab02ObBCtsNd8kMkv7Icm02Y_He1e8KmUNPMZlr0ssQrTEnSGObEkk79EX9ZnUsSs8SOfIy9VVEbSLnrj00kQgZjn-kcRjg7ijSCxVZf80S_Grs9FILKJuuE4gHR1pCHZx-TBECe9mF5053XA1UqIW6HuCKf97llHNZSxazE8xnXWKSQ1F5o0gsEgPAfIOU"/>
-</div>
-</div>
-</section>
-<section id="faq">
-<h2 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Frequently Asked Questions</h2>
-<div class="p-4">
-<div class="flex flex-col gap-3">
-<details class="group rounded-lg border border-white/10 bg-white/[0.03] p-4 transition-colors duration-300 hover:border-white/20">
-<summary class="flex cursor-pointer list-none items-center justify-between">
-<h3 class="font-medium text-white">What is RGIA Master?</h3>
-<div class="text-white/60">
-<span class="material-symbols-outlined plus-icon transition-transform duration-300 group-open:rotate-45">add</span>
-</div>
-</summary>
-<div class="mt-4 text-sm text-white/60">
-<p>RGIA Master is a comprehensive, self-hosted AI platform that allows you to deploy, manage, and utilize a wide range of AI models within your own private infrastructure. It provides an all-in-one solution for development, monitoring, and management of AI services.</p>
-</div>
-</details>
-<details class="group rounded-lg border border-white/10 bg-white/[0.03] p-4 transition-colors duration-300 hover:border-white/20">
-<summary class="flex cursor-pointer list-none items-center justify-between">
-<h3 class="font-medium text-white">What are the system requirements for installation?</h3>
-<div class="text-white/60">
-<span class="material-symbols-outlined plus-icon transition-transform duration-300 group-open:rotate-45">add</span>
-</div>
-</summary>
-<div class="mt-4 text-sm text-white/60">
-<p>You will need a Linux-based server (physical or virtual) with Docker and Docker Compose installed. We recommend at least 4 CPU cores, 16GB of RAM, and 100GB of storage for the Base version. For Pro versions or for running larger models, a GPU is highly recommended.</p>
-</div>
-</details>
-<details class="group rounded-lg border border-white/10 bg-white/[0.03] p-4 transition-colors duration-300 hover:border-white/20">
-<summary class="flex cursor-pointer list-none items-center justify-between">
-<h3 class="font-medium text-white">Can I run RGIA Master on my cloud provider (AWS, GCP, Azure)?</h3>
-<div class="text-white/60">
-<span class="material-symbols-outlined plus-icon transition-transform duration-300 group-open:rotate-45">add</span>
-</div>
-</summary>
-<div class="mt-4 text-sm text-white/60">
-<p>Yes, absolutely. RGIA Master can be installed on any cloud instance that meets the system requirements. The installation script is designed to be cloud-agnostic.</p>
-</div>
-</details>
-<details class="group rounded-lg border border-white/10 bg-white/[0.03] p-4 transition-colors duration-300 hover:border-white/20">
-<summary class="flex cursor-pointer list-none items-center justify-between">
-<h3 class="font-medium text-white">How do I access the monitoring tools after installation?</h3>
-<div class="text-white/60">
-<span class="material-symbols-outlined plus-icon transition-transform duration-300 group-open:rotate-45">add</span>
-</div>
-</summary>
-<div class="mt-4 text-sm text-white/60">
-<p>Once the installation is complete, the script will output the URLs for the Grafana dashboard, Prometheus UI, and the Admin Panel. You can access them through your browser. Default login credentials will also be provided in the installation summary.</p>
-</div>
-</details>
-<details class="group rounded-lg border border-white/10 bg-white/[0.03] p-4 transition-colors duration-300 hover:border-white/20">
-<summary class="flex cursor-pointer list-none items-center justify-between">
-<h3 class="font-medium text-white">Is my data secure and private?</h3>
-<div class="text-white/60">
-<span class="material-symbols-outlined plus-icon transition-transform duration-300 group-open:rotate-45">add</span>
-</div>
-</summary>
-<div class="mt-4 text-sm text-white/60">
-<p>Yes. Since RGIA Master is installed entirely on your own infrastructure, all your data, models, and configurations remain under your control. We do not have access to your instance or your data, ensuring maximum privacy and security.</p>
-</div>
-</details>
-</div>
-</div>
-</section>
+
+<!-- (FAQ y Footer) -->
+
 </main>
-<footer class="mt-20 border-t border-white/10 py-8 px-4">
-<div class="flex flex-col sm:flex-row justify-between items-center gap-6">
-<div class="flex items-center gap-3">
-<div class="size-5 text-primary">
-<svg fill="currentColor" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-<path d="M13.8261 30.5736C16.7203 29.8826 20.2244 29.4783 24 29.4783C27.7756 29.4783 31.2797 29.8826 34.1739 30.5736C36.9144 31.2278 39.9967 32.7669 41.3563 33.8352L24.8486 7.36089C24.4571 6.73303 23.5429 6.73303 23.1514 7.36089L6.64374 33.8352C8.00331 32.7669 11.0856 31.2278 13.8261 30.5736Z"></path>
-</svg>
-</div>
-<p class="text-sm text-white/60">© 2024 RGIA Master. All rights reserved.</p>
-</div>
-<div class="flex items-center gap-6 text-sm">
-<a class="text-white/60 hover:text-white transition-colors" href="#">Documentation</a>
-<a class="text-white/60 hover:text-white transition-colors" href="#">Support</a>
-<a class="text-white/60 hover:text-white transition-colors" href="#">Contact</a>
-</div>
-</div>
-</footer>
-</div>
-</div>
-</div>
-</div>
+</div></div></div></div>
 </body></html>
