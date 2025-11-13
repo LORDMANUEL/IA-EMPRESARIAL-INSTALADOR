@@ -2,6 +2,13 @@
 
 ![RGIA Master Banner](https://raw.githubusercontent.com/g-a-v-i-n/RGIA-Master-RAG-CPU-Lab-On-Prem-Alternative-to-GPT-Enterprise/main/RGIA_MASTER_RAG_ENTERPRISE_AI.png)
 
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0-blue?style=for-the-badge">
+  <img alt="Status" src="https://img.shields.io/badge/status-estable-green?style=for-the-badge">
+  <img alt="License" src="https://img.shields.io/badge/license-Open_Source-lightgrey?style=for-the-badge">
+  <img alt="Compatibility" src="https://img.shields.io/badge/compatible-Ubuntu_|_Debian-orange?style=for-the-badge">
+</p>
+
 **RGIA Master** es una plataforma de **Retrieval-Augmented Generation (RAG)** de código abierto, diseñada para ser desplegada con un solo comando en tu propia infraestructura. Te permite convertir tus documentos corporativos (PDFs, TXT, Markdown) en una base de conocimiento interactiva y segura, accesible a través de una interfaz de chat intuitiva, sin depender de servicios en la nube de terceros.
 
 ## Misión y Visión
@@ -23,6 +30,16 @@ En un mundo donde la información es el activo más valioso, las empresas se aho
 - **Optimización de Costos:** Funciona en hardware modesto (solo CPU), eliminando costosas facturas de GPUs en la nube.
 - **Facilidad de Uso:** Un único script de instalación deja todo el entorno 100% funcional.
 - **Personalización:** Los scripts de RAG están diseñados para ser modificados, permitiéndote adaptar la lógica de IA a tus necesidades específicas.
+
+## Ahorro y Eficiencia: La Ventaja de la Arquitectura RAG
+
+Una de las decisiones estratégicas clave de RGIA Master es el uso de la arquitectura **Retrieval-Augmented Generation (RAG)**. Esto se traduce en un **ahorro masivo de costos y tiempo** en comparación con el enfoque tradicional de re-entrenar o hacer "fine-tuning" de un modelo de lenguaje.
+
+- **Sin necesidad de GPUs costosas:** En lugar de gastar semanas y miles de dólares en GPUs para entrenar un modelo personalizado, RAG utiliza modelos pre-entrenados de propósito general (como `phi3`) y los "aumenta" en tiempo real con la información de tus documentos.
+- **Conocimiento siempre actualizado:** Si tus documentos cambian, simplemente los vuelves a ingestar. Con el fine-tuning, tendrías que repetir el costoso proceso de entrenamiento. RAG separa la "inteligencia" del modelo del "conocimiento" de tus datos, ofreciendo una flexibilidad inigualable.
+- **Menor consumo de recursos:** Al funcionar 100% en CPU, la plataforma puede desplegarse en hardware mucho más accesible, reduciendo drásticamente la barrera de entrada para la IA empresarial.
+
+En resumen, RGIA Master te da el poder de un modelo personalizado sin los costos prohibitivos asociados, democratizando el acceso a la IA avanzada.
 
 ---
 
@@ -89,47 +106,72 @@ RGIA Master se instala en `/opt/rag_lab` y se compone de los siguientes servicio
 
 ---
 
-## Guía de Uso Rápido
+## Flujo de Trabajo y Casos de Uso
 
-### 1. Acceso a los Servicios Internos (Túnel SSH)
+RGIA Master está diseñado para integrarse de forma natural en el flujo de trabajo de tu equipo. A continuación, se describe un ciclo de uso típico.
 
-Para gestionar los archivos y los contenedores, conéctate a tu servidor usando un túnel SSH. Reemplaza `usuario` y `IP_SERVIDOR` con tus datos.
+### Ejemplo de Uso Diario
 
+1.  **Carga de Nuevos Documentos:**
+    *   Un miembro del equipo de marketing se conecta al servidor a través del túnel SSH y accede a **Filebrowser** (`http://localhost:8080`).
+    *   Sube un nuevo estudio de mercado en PDF a la carpeta de documentos. El documento es un PDF escaneado, ilegible para los buscadores tradicionales.
+
+2.  **Proceso de Ingesta (Automático o Manual):**
+    *   **Automático:** Esa noche, a las 03:00 AM, el `cron job` se activa automáticamente. El script de ingesta (versión Base o Pro) detecta el nuevo archivo.
+    *   **Manual (si se necesita inmediatez):** Un administrador se conecta al servidor y ejecuta el comando de re-ingesta:
+        ```bash
+        # Para la versión Base
+        sudo /opt/rag_lab/venv/bin/python /opt/rag_lab/scripts/ingestion_script.py
+
+        # Para la versión Pro
+        sudo /opt/rag_pro/venv/bin/python /opt/rag_pro/scripts/ingestion_script.py
+        ```
+
+3.  **La Magia de la Re-ingesta Inteligente:**
+    *   El script **no re-procesa todos los documentos**. Gracias a un sistema de hashes, identifica únicamente los archivos nuevos o modificados.
+    *   Si se usa la versión Pro, el script aplica **OCR** al PDF escaneado, extrae el texto de las imágenes, lo divide en fragmentos (`chunks`) y genera los `embeddings`.
+    *   Los nuevos vectores de conocimiento se almacenan en la base de datos **Qdrant**.
+
+4.  **Consulta y Obtención de Valor:**
+    *   Al día siguiente, un analista de negocio accede a **Open WebUI** (`http://<IP_DEL_SERVIDOR>:3000`).
+    *   Pregunta: *"¿Cuál es el sentimiento del mercado en el segmento de 18 a 25 años según el último estudio?"*
+    *   El sistema RAG convierte la pregunta en un `embedding`, busca los fragmentos más relevantes en Qdrant (que ahora incluyen el nuevo estudio) y los pasa al LLM junto con la pregunta.
+    *   El LLM genera una respuesta precisa y contextualizada, extrayendo información que antes estaba "atrapada" en un PDF escaneado.
+
+---
+
+## Despliegue en un Servidor en la Nube (Cloud VM)
+
+RGIA Master es ideal para ser desplegado en cualquier proveedor de nube que ofrezca VMs con Linux (por ejemplo, **DigitalOcean, Vultr, Linode, AWS EC2, Azure VM, etc.**).
+
+### Pasos para el Despliegue:
+
+1.  **Crear una VM:** Elige una VM con **Ubuntu 22.04** y que cumpla los [requisitos mínimos](#requisitos-mínimos) (se recomiendan 4+ vCPUs y 16 GB de RAM).
+2.  **Configurar el Firewall de la Nube:** En el panel de control de tu proveedor, asegúrate de que el firewall de red permita el tráfico entrante en los siguientes puertos:
+    *   `TCP/22` (para SSH, esencial para la administración).
+    *   `TCP/3000` (para el acceso público a Open WebUI).
+3.  **Instalar RGIA Master:** Conéctate a tu nueva VM por SSH y sigue las [instrucciones de instalación](#dos-versiones-dos-soluciones) para la versión Base o Pro.
+
+### Aprovechando la Plataforma de Forma Segura: El Túnel SSH
+
+La arquitectura de RGIA Master está diseñada para ser segura por defecto. Servicios críticos como el gestor de archivos, la administración de Docker o el Control Center **no están expuestos a internet**. Para acceder a ellos, debes usar un **túnel SSH**.
+
+Este comando, ejecutado desde **tu máquina local**, crea un túnel seguro a tu VM en la nube:
 ```bash
-ssh -L 8080:127.0.0.1:8080 -L 9000:127.0.0.1:9000 usuario@IP_SERVIDOR
+# Reemplaza `usuario` y `IP_DEL_SERVIDOR` con los datos de tu VM
+ssh -L 8080:127.0.0.1:8080 -L 9000:127.0.0.1:9000 -L 8000:127.0.0.1:8000 -N usuario@IP_DEL_SERVIDOR
 ```
+*   `-L 8080:127.0.0.1:8080`: Redirige el puerto `8080` de tu máquina local al puerto `8080` de la VM (Filebrowser).
+*   `-L 9000:127.0.0.1:9000`: Redirige el puerto `9000` local a la VM (Portainer).
+*   `-L 8000:127.0.0.1:8000`: Redirige el puerto `8000` local a la VM (RGIA Control Center - solo en versión Pro).
+*   `-N`: Indica a SSH que no ejecute un comando remoto, solo establezca el túnel.
 
-- **Gestor de Archivos (Filebrowser):** Abre `http://localhost:8080` en tu navegador.
-  - **Usuario:** `admin`
-  - **Contraseña:** `admin`
-- **Gestor de Docker (Portainer):** Abre `http://localhost:9000`.
+Mientras este comando esté activo en tu terminal local, puedes abrir tu navegador y acceder a:
+- **Filebrowser:** `http://localhost:8080`
+- **Portainer:** `http://localhost:9000`
+- **RGIA Control Center:** `http://localhost:8000`
 
-### 2. Sube tus Documentos
-
-Usa **Filebrowser** (`http://localhost:8080`) para subir tus archivos PDF, TXT o MD al directorio `/srv` (que corresponde a `/opt/rag_lab/documents` en el servidor).
-
-### 3. Ingesta de Datos
-
-La plataforma está configurada para **buscar y procesar nuevos documentos automáticamente todas las noches a las 03:00 AM** (hora del servidor).
-
-Si deseas ejecutar la ingesta manualmente, conéctate al servidor y ejecuta:
-```bash
-sudo /opt/rag_lab/venv/bin/python /opt/rag_lab/scripts/ingestion_script.py
-```
-
-### 4. Chatea con tus Documentos
-
-Abre la interfaz de **Open WebUI** en tu navegador: `http://<IP_DEL_SERVIDOR>:3000`.
-
-¡Ya puedes empezar a hacer preguntas sobre tus documentos! El sistema buscará la información relevante y generará una respuesta utilizando el LLM local.
-
-### 5. Personaliza el Comportamiento RAG
-
-El corazón de la lógica RAG vive en `/opt/rag_lab/scripts`. Estos scripts Python están diseñados para ser el punto de partida. Puedes modificarlos para:
-- Cambiar el modelo de embedding.
-- Ajustar el tamaño de los fragmentos (`chunk_size`).
-- Implementar lógicas de filtrado de metadatos.
-- Integrarlo con otras APIs internas.
+Este método te da acceso administrativo total sin exponer nunca esos servicios a la red pública, combinando la flexibilidad de la nube con la seguridad del acceso local.
 
 ---
 
